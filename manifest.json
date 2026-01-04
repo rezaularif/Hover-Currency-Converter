@@ -3,7 +3,7 @@
    "name": "Hover Currency Converter",
    "version": "1.0.0",
    "description": "Convert currency prices on hover - see converted values instantly when hovering over prices",
-  "permissions": ["storage", "sidePanel"],
+  "permissions": ["storage", "sidePanel", "activeTab"],
    "host_permissions": [
      "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@*/*",
      "https://*.currency-api.pages.dev/*"
