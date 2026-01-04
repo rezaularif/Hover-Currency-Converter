@@ -1,0 +1,173 @@
+ .hcc-tooltip {
+   position: fixed;
+   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+   color: white;
+   padding: 8px 12px;
+   border-radius: 8px;
+   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+   font-size: 14px;
+   font-weight: 500;
+   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+   z-index: 2147483647;
+   pointer-events: none;
+   opacity: 0;
+   transform: translateY(5px);
+   transition: opacity 0.2s ease, transform 0.2s ease;
+   white-space: nowrap;
+ }
+ 
+ .hcc-tooltip.visible {
+   opacity: 1;
+   transform: translateY(0);
+ }
+ 
+/* Default arrow base */
+.hcc-tooltip::before {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+/* Arrow for tooltip below cursor (arrow points up) */
+.hcc-tooltip.hcc-pos-below::before {
+  top: -6px;
+  left: 12px;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 6px solid #667eea;
+}
+
+/* Arrow for tooltip above cursor (arrow points down) */
+.hcc-tooltip.hcc-pos-above::before {
+  bottom: -6px;
+  left: 12px;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid #764ba2;
+}
+
+/* Arrow for tooltip left of cursor (arrow points right) */
+.hcc-tooltip.hcc-pos-left::before {
+  top: 50%;
+  right: -6px;
+  transform: translateY(-50%);
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-left: 6px solid #764ba2;
+}
+
+/* Arrow for tooltip right of cursor (arrow points left) */
+.hcc-tooltip.hcc-pos-right::before {
+  top: 50%;
+  left: -6px;
+  transform: translateY(-50%);
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-right: 6px solid #667eea;
+}
+ 
+ .hcc-tooltip .hcc-arrow {
+   font-size: 12px;
+   margin: 0 6px;
+   opacity: 0.8;
+ }
+ 
+ .hcc-tooltip .hcc-original {
+   opacity: 0.9;
+ }
+ 
+ .hcc-tooltip .hcc-converted {
+   font-weight: 600;
+ }
+ 
+ .hcc-highlight {
+   background-color: rgba(102, 126, 234, 0.1);
+   border-radius: 2px;
+   transition: background-color 0.2s ease;
+ }
+
+/* ===== TOOLTIP THEMES ===== */
+
+/* Purple Gradient (default) - no additional class needed */
+
+/* Ocean Blue Gradient */
+.hcc-tooltip.hcc-theme-ocean-gradient {
+  background: linear-gradient(135deg, #2193b0 0%, #6dd5ed 100%);
+}
+.hcc-tooltip.hcc-theme-ocean-gradient.hcc-pos-below::before { border-bottom-color: #2193b0; }
+.hcc-tooltip.hcc-theme-ocean-gradient.hcc-pos-above::before { border-top-color: #6dd5ed; }
+.hcc-tooltip.hcc-theme-ocean-gradient.hcc-pos-left::before { border-left-color: #6dd5ed; }
+.hcc-tooltip.hcc-theme-ocean-gradient.hcc-pos-right::before { border-right-color: #2193b0; }
+
+/* Sunset Gradient */
+.hcc-tooltip.hcc-theme-sunset-gradient {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+.hcc-tooltip.hcc-theme-sunset-gradient.hcc-pos-below::before { border-bottom-color: #f093fb; }
+.hcc-tooltip.hcc-theme-sunset-gradient.hcc-pos-above::before { border-top-color: #f5576c; }
+.hcc-tooltip.hcc-theme-sunset-gradient.hcc-pos-left::before { border-left-color: #f5576c; }
+.hcc-tooltip.hcc-theme-sunset-gradient.hcc-pos-right::before { border-right-color: #f093fb; }
+
+/* Forest Gradient */
+.hcc-tooltip.hcc-theme-forest-gradient {
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+}
+.hcc-tooltip.hcc-theme-forest-gradient.hcc-pos-below::before { border-bottom-color: #11998e; }
+.hcc-tooltip.hcc-theme-forest-gradient.hcc-pos-above::before { border-top-color: #38ef7d; }
+.hcc-tooltip.hcc-theme-forest-gradient.hcc-pos-left::before { border-left-color: #38ef7d; }
+.hcc-tooltip.hcc-theme-forest-gradient.hcc-pos-right::before { border-right-color: #11998e; }
+
+/* Golden Gradient */
+.hcc-tooltip.hcc-theme-golden-gradient {
+  background: linear-gradient(135deg, #f2994a 0%, #f2c94c 100%);
+}
+.hcc-tooltip.hcc-theme-golden-gradient.hcc-pos-below::before { border-bottom-color: #f2994a; }
+.hcc-tooltip.hcc-theme-golden-gradient.hcc-pos-above::before { border-top-color: #f2c94c; }
+.hcc-tooltip.hcc-theme-golden-gradient.hcc-pos-left::before { border-left-color: #f2c94c; }
+.hcc-tooltip.hcc-theme-golden-gradient.hcc-pos-right::before { border-right-color: #f2994a; }
+
+/* Dark Gray Solid */
+.hcc-tooltip.hcc-theme-dark-gray {
+  background: #374151;
+}
+.hcc-tooltip.hcc-theme-dark-gray.hcc-pos-below::before { border-bottom-color: #374151; }
+.hcc-tooltip.hcc-theme-dark-gray.hcc-pos-above::before { border-top-color: #374151; }
+.hcc-tooltip.hcc-theme-dark-gray.hcc-pos-left::before { border-left-color: #374151; }
+.hcc-tooltip.hcc-theme-dark-gray.hcc-pos-right::before { border-right-color: #374151; }
+
+/* Navy Blue Solid */
+.hcc-tooltip.hcc-theme-navy-blue {
+  background: #1e3a5f;
+}
+.hcc-tooltip.hcc-theme-navy-blue.hcc-pos-below::before { border-bottom-color: #1e3a5f; }
+.hcc-tooltip.hcc-theme-navy-blue.hcc-pos-above::before { border-top-color: #1e3a5f; }
+.hcc-tooltip.hcc-theme-navy-blue.hcc-pos-left::before { border-left-color: #1e3a5f; }
+.hcc-tooltip.hcc-theme-navy-blue.hcc-pos-right::before { border-right-color: #1e3a5f; }
+
+/* Deep Purple Solid */
+.hcc-tooltip.hcc-theme-deep-purple {
+  background: #5b21b6;
+}
+.hcc-tooltip.hcc-theme-deep-purple.hcc-pos-below::before { border-bottom-color: #5b21b6; }
+.hcc-tooltip.hcc-theme-deep-purple.hcc-pos-above::before { border-top-color: #5b21b6; }
+.hcc-tooltip.hcc-theme-deep-purple.hcc-pos-left::before { border-left-color: #5b21b6; }
+.hcc-tooltip.hcc-theme-deep-purple.hcc-pos-right::before { border-right-color: #5b21b6; }
+
+/* Teal Solid */
+.hcc-tooltip.hcc-theme-teal {
+  background: #0d9488;
+}
+.hcc-tooltip.hcc-theme-teal.hcc-pos-below::before { border-bottom-color: #0d9488; }
+.hcc-tooltip.hcc-theme-teal.hcc-pos-above::before { border-top-color: #0d9488; }
+.hcc-tooltip.hcc-theme-teal.hcc-pos-left::before { border-left-color: #0d9488; }
+.hcc-tooltip.hcc-theme-teal.hcc-pos-right::before { border-right-color: #0d9488; }
+
+/* Slate Solid */
+.hcc-tooltip.hcc-theme-slate {
+  background: #475569;
+}
+.hcc-tooltip.hcc-theme-slate.hcc-pos-below::before { border-bottom-color: #475569; }
+.hcc-tooltip.hcc-theme-slate.hcc-pos-above::before { border-top-color: #475569; }
+.hcc-tooltip.hcc-theme-slate.hcc-pos-left::before { border-left-color: #475569; }
+.hcc-tooltip.hcc-theme-slate.hcc-pos-right::before { border-right-color: #475569; }

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Currency Converter</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="header-icon">$</div>
+      <h1>Hover Converter</h1>
+      <p class="subtitle">Real-time cursor hover currency conversion</p>
+    </header>
+    
+    <section class="section">
+      <label class="section-label">Target Currency</label>
+      <div class="custom-select-wrapper custom-select-full">
+        <button type="button" id="targetCurrencyBtn" class="custom-select-btn custom-select-btn-full">
+          <span id="targetCurrencyDisplay">🇪🇺 EUR - Euro</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </button>
+        <div id="targetCurrencyDropdown" class="custom-dropdown custom-dropdown-full hidden">
+          <div class="dropdown-list" id="targetCurrencyList"></div>
+        </div>
+        <select id="targetCurrency" style="display:none;">
+          <option value="">Loading currencies...</option>
+        </select>
+      </div>
+    </section>
+
+    <section class="section converter-section">
+      <label class="section-label">Quick Convert</label>
+      <div class="converter-row">
+        <input type="number" id="fromAmount" class="amount-input" placeholder="Enter amount" value="100">
+        <div class="custom-select-wrapper">
+          <button type="button" id="fromCurrencyBtn" class="custom-select-btn">
+            <span id="fromCurrencyDisplay">🇺🇸 USD</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </button>
+          <div id="fromCurrencyDropdown" class="custom-dropdown hidden">
+            <div class="dropdown-list" id="fromCurrencyList"></div>
+          </div>
+          <select id="fromCurrency" class="hidden-select" style="display:none;">
+            <option value="">...</option>
+          </select>
+        </div>
+      </div>
+      <button class="swap-btn" id="swapBtn" title="Swap currencies">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/>
+        </svg>
+      </button>
+      <div class="result-box" id="convertResult">
+        <span class="result-amount">--</span>
+        <span class="result-currency" id="resultCurrency">EUR</span>
+      </div>
+    </section>
+
+    <section class="section preference-section">
+      <label class="section-label">Display Preferences</label>
+
+      <div class="preference-row">
+        <span class="preference-label">Decimal places</span>
+        <select id="decimalPlaces" class="preference-select">
+          <option value="0">0</option>
+          <option value="1">1</option>
+          <option value="2" selected>2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+        </select>
+      </div>
+
+      <div class="preference-row">
+        <span class="preference-label">Tooltip position</span>
+        <select id="tooltipPosition" class="preference-select">
+          <option value="above">Above</option>
+          <option value="below" selected>Below</option>
+          <option value="left">Left</option>
+          <option value="right">Right</option>
+        </select>
+      </div>
+
+      <div class="preference-row">
+        <span class="preference-label">Tooltip theme</span>
+        <select id="tooltipTheme" class="preference-select theme-select">
+          <optgroup label="Gradients">
+            <option value="purple-gradient" selected>Purple</option>
+            <option value="ocean-gradient">Ocean Blue</option>
+            <option value="sunset-gradient">Sunset</option>
+            <option value="forest-gradient">Forest</option>
+            <option value="golden-gradient">Golden</option>
+          </optgroup>
+          <optgroup label="Solid Colors">
+            <option value="dark-gray">Dark Gray</option>
+            <option value="navy-blue">Navy Blue</option>
+            <option value="deep-purple">Deep Purple</option>
+            <option value="teal">Teal</option>
+            <option value="slate">Slate</option>
+          </optgroup>
+        </select>
+      </div>
+
+      <div class="preference-row">
+        <span class="preference-label">Result display gradient</span>
+        <select id="resultGradient" class="preference-select theme-select">
+          <option value="purple-orange" selected>Purple</option>
+          <option value="ocean-blue">Ocean</option>
+          <option value="sunset">Sunset</option>
+          <option value="forest">Forest</option>
+          <option value="golden">Golden</option>
+          <option value="purple-pink">Pink</option>
+          <option value="blue-cyan">Cyan</option>
+          <option value="red-orange">Red</option>
+          <option value="teal-green">Teal</option>
+        </select>
+      </div>
+
+      <div class="preference-row">
+        <span class="preference-label">Enable on all websites</span>
+        <label class="toggle">
+          <input type="checkbox" id="enableToggle" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div class="status" id="status">
+        <span class="status-dot"></span>
+        <span class="status-text">Loading rates...</span>
+      </div>
+      <div class="powered-by">Rates from aggregated financial data sources</div>
+    </footer>
+   </div>
+  
+  <script src="sidepanel.js"></script>
+</body>
+</html>

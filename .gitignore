@@ -1,0 +1,17 @@
+# Documentation files
+*.md
+
+# Archive files
+*.zip
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
