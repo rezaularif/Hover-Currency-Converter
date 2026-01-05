@@ -1,6 +1,7 @@
-# Documentation files (except README.md)
+# Documentation files (except README.md and PRIVACY_POLICY.md)
 *.md
 !README.md
+!PRIVACY_POLICY.md
 
 # Archive files
 *.zip

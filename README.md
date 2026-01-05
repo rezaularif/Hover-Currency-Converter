@@ -1,5 +1,9 @@
 # Hover Currency Converter
 
+<div align="center">
+  <img src="icons/icon120.png" alt="Hover Currency Converter Icon" width="120" height="120">
+</div>
+
 [![Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-Available-brightgreen)](https://chromewebstore.google.com/detail/hover-currency-converter/plbdgcecigogedfihfmabohdbbbokfka)
 [![Version](https://img.shields.io/badge/version-1.0.1-blue)](https://chromewebstore.google.com/detail/hover-currency-converter/plbdgcecigogedfihfmabohdbbbokfka)
 
