@@ -1,5 +1,6 @@
-# Documentation files
+# Documentation files (except README.md)
 *.md
+!README.md
 
 # Archive files
 *.zip
