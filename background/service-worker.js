@@ -87,9 +87,33 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-// Open side panel when extension icon is clicked
-chrome.action.onClicked.addListener((tab) => {
-  chrome.sidePanel.open({ windowId: tab.windowId });
+// Inject content script and open side panel when extension icon is clicked
+chrome.action.onClicked.addListener(async (tab) => {
+  // Open side panel first
+  try {
+    await chrome.sidePanel.open({ windowId: tab.windowId });
+  } catch (error) {
+    console.error('Failed to open side panel:', error);
+  }
+  
+  // Inject content script and CSS into the active tab (if possible)
+  // Only inject on http/https pages, skip chrome:// and other restricted pages
+  if (tab.url && (tab.url.startsWith('http://') || tab.url.startsWith('https://'))) {
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ['content/content.js']
+      });
+      
+      await chrome.scripting.insertCSS({
+        target: { tabId: tab.id },
+        files: ['content/content.css']
+      });
+    } catch (error) {
+      // Ignore errors for restricted pages
+      console.log('Could not inject script:', error);
+    }
+  }
 });
 
 chrome.runtime.onInstalled.addListener(() => {

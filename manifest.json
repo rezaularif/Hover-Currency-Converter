@@ -1,13 +1,13 @@
- {
-   "manifest_version": 3,
-   "name": "Hover Currency Converter",
-   "version": "1.0.0",
-   "description": "Convert currency prices on hover - see converted values instantly when hovering over prices",
-  "permissions": ["storage", "sidePanel", "activeTab"],
-   "host_permissions": [
-     "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@*/*",
-     "https://*.currency-api.pages.dev/*"
-   ],
+{
+  "manifest_version": 3,
+  "name": "Hover Currency Converter",
+  "version": "1.0.1",
+  "description": "Convert currency prices on hover - see converted values instantly when hovering over prices",
+  "permissions": ["storage", "sidePanel", "activeTab", "scripting"],
+  "host_permissions": [
+    "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@*/*",
+    "https://*.currency-api.pages.dev/*"
+  ],
   "action": {
     "default_icon": {
       "16": "icons/icon128.png",
@@ -18,21 +18,13 @@
   "side_panel": {
     "default_path": "sidepanel/sidepanel.html"
   },
-   "background": {
-     "service_worker": "background/service-worker.js",
-     "type": "module"
-   },
-   "content_scripts": [
-     {
-      "matches": ["http://*/*", "https://*/*"],
-       "js": ["content/content.js"],
-       "css": ["content/content.css"],
-       "run_at": "document_idle"
-     }
-   ],
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
   "icons": {
     "16": "icons/icon128.png",
     "48": "icons/icon128.png",
     "128": "icons/icon128.png"
   }
- }
+}
