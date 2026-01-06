@@ -162,11 +162,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const currencies = await fetchCurrencies();
     if (currencies) {
       allCurrencies = currencies;
-      
-      // Get saved values first
-      const saved = await chrome.storage.sync.get(['targetCurrency', 'fromCurrency']);
-      const savedTarget = saved.targetCurrency || 'EUR';
-      const savedFrom = saved.fromCurrency || 'USD';
+
+      // Get saved values with defaults (Issue 3: Storage initialization)
+      const saved = await chrome.storage.sync.get({
+        targetCurrency: 'EUR',
+        fromCurrency: 'USD'
+      });
+      const savedTarget = saved.targetCurrency;
+      const savedFrom = saved.fromCurrency;
       
       populateCurrencySelect(targetCurrency, currencies, savedTarget, false);
       populateCurrencySelect(fromCurrency, currencies, savedFrom, true);
@@ -377,21 +380,27 @@ document.addEventListener('DOMContentLoaded', () => {
   
   initCurrencies();
 
-  // Load saved settings
-  chrome.storage.sync.get(['enabled'], (result) => {
-    enableToggle.checked = result.enabled !== false;
+  // Load saved settings with defaults (Issue 3: Storage initialization)
+  chrome.storage.sync.get({ enabled: true }, (result) => {
+    enableToggle.checked = result.enabled;
   });
 
-  // Load all local storage data in one call
-  chrome.storage.local.get(['decimalPlaces', 'tooltipPosition', 'tooltipTheme', 'resultGradient', 'lastFetch'], (result) => {
+  // Load all local storage data in one call with defaults
+  chrome.storage.local.get({
+    decimalPlaces: 2,
+    tooltipPosition: 'below',
+    tooltipTheme: 'purple-gradient',
+    resultGradient: 'purple-orange',
+    lastFetch: null
+  }, (result) => {
     // User preferences
-    currentDecimalPlaces = result.decimalPlaces ?? 2;
+    currentDecimalPlaces = result.decimalPlaces;
     decimalPlacesSelect.value = currentDecimalPlaces;
-    tooltipPositionSelect.value = result.tooltipPosition ?? 'below';
-    tooltipThemeSelect.value = result.tooltipTheme ?? 'purple-gradient';
-    
+    tooltipPositionSelect.value = result.tooltipPosition;
+    tooltipThemeSelect.value = result.tooltipTheme;
+
     // Apply result gradient
-    const savedGradient = result.resultGradient ?? 'purple-orange';
+    const savedGradient = result.resultGradient;
     resultGradientSelect.value = savedGradient;
     applyResultGradient(savedGradient);
 

@@ -14,6 +14,8 @@
    transform: translateY(5px);
    transition: opacity 0.2s ease, transform 0.2s ease;
    white-space: nowrap;
+   /* Accessibility: ensure text contrast on all backgrounds */
+   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
  }
  
  .hcc-tooltip.visible {
@@ -103,6 +105,8 @@
 /* Sunset Gradient */
 .hcc-tooltip.hcc-theme-sunset-gradient {
   background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  /* Stronger shadow for lighter backgrounds */
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 .hcc-tooltip.hcc-theme-sunset-gradient.hcc-pos-below::before { border-bottom-color: #f093fb; }
 .hcc-tooltip.hcc-theme-sunset-gradient.hcc-pos-above::before { border-top-color: #f5576c; }
@@ -121,6 +125,8 @@
 /* Golden Gradient */
 .hcc-tooltip.hcc-theme-golden-gradient {
   background: linear-gradient(135deg, #f2994a 0%, #f2c94c 100%);
+  /* Stronger shadow for lighter backgrounds */
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 .hcc-tooltip.hcc-theme-golden-gradient.hcc-pos-below::before { border-bottom-color: #f2994a; }
 .hcc-tooltip.hcc-theme-golden-gradient.hcc-pos-above::before { border-top-color: #f2c94c; }

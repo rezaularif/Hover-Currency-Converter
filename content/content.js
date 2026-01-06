@@ -35,16 +35,25 @@
     YER: '🇾🇪 ﷼', ZAR: '🇿🇦 R', ZMW: '🇿🇲 ZK', ZWL: '🇿🇼 $'
   };
 
+  // Expanded symbol to currency mapping (including additional symbols)
   const SYMBOL_TO_CURRENCY = {
     '$': 'USD', '€': 'EUR', '£': 'GBP', '¥': 'JPY', '₹': 'INR',
     '₩': 'KRW', '₺': 'TRY', '฿': 'THB', '₱': 'PHP', '₪': 'ILS',
-    '৳': 'BDT', '₨': 'PKR'
+    '৳': 'BDT', '₨': 'PKR', '₽': 'RUB', '₸': 'KZT', '₮': 'MNT',
+    '₭': 'LAK', '₾': 'GEL', '₦': 'NGN', '₲': 'PYG', '₴': 'UAH',
+    '₫': 'VND', '₡': 'CRC', '₵': 'GHS', '﷼': 'SAR', 'R$': 'BRL',
+    'zł': 'PLN', 'Kč': 'CZK', 'kr': 'SEK', 'CHF': 'CHF'
   };
 
-  // Pre-compiled regex patterns (avoid recreation on each call)
-  const REGEX_SYMBOL_BEFORE = /([$€£¥₹₩₺฿₱₪৳₨])\s?([\d,]+(?:\.\d{1,2})?)/;
-  const REGEX_SYMBOL_AFTER = /([\d,]+(?:\.\d{1,2})?)\s?([$€£¥₹₩₺฿₱₪৳₨])/;
+  // Pre-compiled regex patterns for US format (1,234.56)
+  const REGEX_SYMBOL_BEFORE = /([$€£¥₹₩₺฿₱₪৳₨₽₸₮₭₾₦₲₴₫₡₵﷼])\s?([\d,]+(?:\.\d{1,2})?)/;
+  const REGEX_SYMBOL_AFTER = /([\d,]+(?:\.\d{1,2})?)\s?([$€£¥₹₩₺฿₱₪৳₨₽₸₮₭₾₦₲₴₫₡₵﷼])/;
   const REGEX_CODE_AFTER = /([\d,]+(?:\.\d{1,2})?)\s?([A-Z]{3})\b/;
+
+  // Pre-compiled regex patterns for European format (1.234,56)
+  const REGEX_SYMBOL_BEFORE_EU = /([$€£¥₹₩₺฿₱₪৳₨₽₸₮₭₾₦₲₴₫₡₵﷼])\s?([\d.]+(?:,\d{1,2})?)/;
+  const REGEX_SYMBOL_AFTER_EU = /([\d.]+(?:,\d{1,2})?)\s?([$€£¥₹₩₺฿₱₪৳₨₽₸₮₭₾₦₲₴₫₡₵﷼])/;
+  const REGEX_CODE_AFTER_EU = /([\d.]+(?:,\d{1,2})?)\s?([A-Z]{3})\b/;
  
   let tooltip = null;
   let targetCurrency = 'EUR';
@@ -57,25 +66,53 @@
   let lastMoveTime = 0;
   let listenersAttached = false;
   let hideTimeout = null;
+  let mouseOverTimeout = null;
+
+  // Performance: Debounce utility for mouseover events
+  function debounce(fn, delay) {
+    let timer;
+    return function(...args) {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn.apply(this, args), delay);
+    };
+  }
  
   function createTooltip() {
     if (tooltip) return;
     tooltip = document.createElement('div');
     tooltip.className = 'hcc-tooltip';
+    tooltip.setAttribute('role', 'tooltip');
+    tooltip.setAttribute('aria-live', 'polite');
     document.body.appendChild(tooltip);
   }
  
-  function showTooltip(x, y, original, converted, fromCode, toCode) {
+  function showTooltip(x, y, original, converted, fromCode, toCode, serverDecimals) {
     if (!tooltip) createTooltip();
 
     const fromSymbol = CURRENCY_SYMBOLS[fromCode] || fromCode;
     const toSymbol = CURRENCY_SYMBOLS[toCode] || toCode;
 
-    tooltip.innerHTML = `
-      <span class="hcc-original">${fromSymbol}${original.toLocaleString()}</span>
-      <span class="hcc-arrow">→</span>
-      <span class="hcc-converted">${toSymbol}${converted.toLocaleString(undefined, { minimumFractionDigits: decimalPlaces, maximumFractionDigits: decimalPlaces })}</span>
-    `;
+    // Use server-provided decimals (ISO 4217) if available, otherwise fall back to user preference
+    const displayDecimals = serverDecimals !== undefined ? serverDecimals : decimalPlaces;
+
+    // Security: Use textContent instead of innerHTML to prevent XSS
+    tooltip.textContent = '';
+
+    const originalSpan = document.createElement('span');
+    originalSpan.className = 'hcc-original';
+    originalSpan.textContent = `${fromSymbol}${original.toLocaleString()}`;
+
+    const arrowSpan = document.createElement('span');
+    arrowSpan.className = 'hcc-arrow';
+    arrowSpan.textContent = '→';
+
+    const convertedSpan = document.createElement('span');
+    convertedSpan.className = 'hcc-converted';
+    convertedSpan.textContent = `${toSymbol}${converted.toLocaleString(undefined, { minimumFractionDigits: displayDecimals, maximumFractionDigits: displayDecimals })}`;
+
+    tooltip.appendChild(originalSpan);
+    tooltip.appendChild(arrowSpan);
+    tooltip.appendChild(convertedSpan);
 
     positionTooltip(x, y);
 
@@ -163,6 +200,7 @@
   function parseCurrency(text) {
     let match, currency, amount;
 
+    // Try US format first (1,234.56)
     if ((match = text.match(REGEX_SYMBOL_BEFORE))) {
       currency = SYMBOL_TO_CURRENCY[match[1]];
       amount = parseFloat(match[2].replace(/,/g, ''));
@@ -172,6 +210,18 @@
     } else if ((match = text.match(REGEX_CODE_AFTER))) {
       currency = match[2];
       amount = parseFloat(match[1].replace(/,/g, ''));
+    }
+    // Try European format (1.234,56) - only if US format didn't match
+    else if ((match = text.match(REGEX_SYMBOL_BEFORE_EU))) {
+      currency = SYMBOL_TO_CURRENCY[match[1]];
+      // Convert European format: remove dots (thousands), replace comma with dot (decimal)
+      amount = parseFloat(match[2].replace(/\./g, '').replace(',', '.'));
+    } else if ((match = text.match(REGEX_SYMBOL_AFTER_EU))) {
+      currency = SYMBOL_TO_CURRENCY[match[2]];
+      amount = parseFloat(match[1].replace(/\./g, '').replace(',', '.'));
+    } else if ((match = text.match(REGEX_CODE_AFTER_EU))) {
+      currency = match[2];
+      amount = parseFloat(match[1].replace(/\./g, '').replace(',', '.'));
     }
 
     if (currency && !isNaN(amount) && amount > 0) {
@@ -231,7 +281,7 @@
         toCurrency: targetCurrency
       }, response => {
         if (response?.success && pendingRequest === target && currentElement === target) {
-          showTooltip(e.clientX, e.clientY, parsed.amount, response.converted, parsed.currency, targetCurrency);
+          showTooltip(e.clientX, e.clientY, parsed.amount, response.converted, parsed.currency, targetCurrency, response.decimals);
         }
       });
     } else {
@@ -280,10 +330,17 @@
     }
   }
  
+  // Performance: Create debounced version of handleMouseOver (100ms delay)
+  let debouncedMouseOver = null;
+
   function attachListeners() {
     if (listenersAttached) return;
     createTooltip();
-    document.addEventListener('mouseover', handleMouseOver, true);
+
+    // Use debounced mouseover for performance
+    debouncedMouseOver = debounce(handleMouseOver, 100);
+
+    document.addEventListener('mouseover', debouncedMouseOver, true);
     document.addEventListener('mouseout', handleMouseOut, true);
     document.addEventListener('mousemove', handleMouseMove, true);
     listenersAttached = true;
@@ -296,7 +353,7 @@
       clearTimeout(hideTimeout);
       hideTimeout = null;
     }
-    document.removeEventListener('mouseover', handleMouseOver, true);
+    document.removeEventListener('mouseover', debouncedMouseOver, true);
     document.removeEventListener('mouseout', handleMouseOut, true);
     document.removeEventListener('mousemove', handleMouseMove, true);
     hideTooltip();
@@ -304,21 +361,28 @@
   }
 
   function init() {
-    // Load all settings in one call
-    chrome.storage.sync.get(['targetCurrency', 'enabled'], (result) => {
-      targetCurrency = result.targetCurrency || 'EUR';
-      enabled = result.enabled !== false;
+    // Load all settings in one call with defaults (Issue 3: Storage initialization)
+    chrome.storage.sync.get({
+      targetCurrency: 'EUR',
+      enabled: true
+    }, (result) => {
+      targetCurrency = result.targetCurrency;
+      enabled = result.enabled;
 
       if (enabled) {
         attachListeners();
       }
     });
 
-    // Load local preferences
-    chrome.storage.local.get(['decimalPlaces', 'tooltipPosition', 'tooltipTheme'], (result) => {
-      decimalPlaces = result.decimalPlaces ?? 2;
-      tooltipPosition = result.tooltipPosition ?? 'below';
-      tooltipTheme = result.tooltipTheme ?? 'purple-gradient';
+    // Load local preferences with defaults
+    chrome.storage.local.get({
+      decimalPlaces: 2,
+      tooltipPosition: 'below',
+      tooltipTheme: 'purple-gradient'
+    }, (result) => {
+      decimalPlaces = result.decimalPlaces;
+      tooltipPosition = result.tooltipPosition;
+      tooltipTheme = result.tooltipTheme;
     });
 
     // Listen for changes

@@ -17,11 +17,11 @@
     <section class="section">
       <label class="section-label">Target Currency</label>
       <div class="custom-select-wrapper custom-select-full">
-        <button type="button" id="targetCurrencyBtn" class="custom-select-btn custom-select-btn-full">
+        <button type="button" id="targetCurrencyBtn" class="custom-select-btn custom-select-btn-full" aria-label="Select target currency" aria-haspopup="listbox" aria-expanded="false">
           <span id="targetCurrencyDisplay">🇪🇺 EUR - Euro</span>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
         </button>
-        <div id="targetCurrencyDropdown" class="custom-dropdown custom-dropdown-full hidden">
+        <div id="targetCurrencyDropdown" class="custom-dropdown custom-dropdown-full hidden" role="listbox" aria-label="Target currency options">
           <div class="dropdown-list" id="targetCurrencyList"></div>
         </div>
         <select id="targetCurrency" style="display:none;">
@@ -33,13 +33,13 @@
     <section class="section converter-section">
       <label class="section-label">Quick Convert</label>
       <div class="converter-row">
-        <input type="number" id="fromAmount" class="amount-input" placeholder="Enter amount" value="100">
+        <input type="number" id="fromAmount" class="amount-input" placeholder="Enter amount" value="100" aria-label="Amount to convert">
         <div class="custom-select-wrapper">
-          <button type="button" id="fromCurrencyBtn" class="custom-select-btn">
+          <button type="button" id="fromCurrencyBtn" class="custom-select-btn" aria-label="Select source currency" aria-haspopup="listbox" aria-expanded="false">
             <span id="fromCurrencyDisplay">🇺🇸 USD</span>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
           </button>
-          <div id="fromCurrencyDropdown" class="custom-dropdown hidden">
+          <div id="fromCurrencyDropdown" class="custom-dropdown hidden" role="listbox" aria-label="Source currency options">
             <div class="dropdown-list" id="fromCurrencyList"></div>
           </div>
           <select id="fromCurrency" class="hidden-select" style="display:none;">
@@ -47,7 +47,7 @@
           </select>
         </div>
       </div>
-      <button class="swap-btn" id="swapBtn" title="Swap currencies">
+      <button class="swap-btn" id="swapBtn" title="Swap currencies" aria-label="Swap source and target currencies">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/>
         </svg>
@@ -62,8 +62,8 @@
       <label class="section-label">Display Preferences</label>
 
       <div class="preference-row">
-        <span class="preference-label">Decimal places</span>
-        <select id="decimalPlaces" class="preference-select">
+        <span class="preference-label" id="decimalPlacesLabel">Decimal places</span>
+        <select id="decimalPlaces" class="preference-select" aria-labelledby="decimalPlacesLabel">
           <option value="0">0</option>
           <option value="1">1</option>
           <option value="2" selected>2</option>
@@ -73,8 +73,8 @@
       </div>
 
       <div class="preference-row">
-        <span class="preference-label">Tooltip position</span>
-        <select id="tooltipPosition" class="preference-select">
+        <span class="preference-label" id="tooltipPositionLabel">Tooltip position</span>
+        <select id="tooltipPosition" class="preference-select" aria-labelledby="tooltipPositionLabel">
           <option value="above">Above</option>
           <option value="below" selected>Below</option>
           <option value="left">Left</option>
@@ -83,8 +83,8 @@
       </div>
 
       <div class="preference-row">
-        <span class="preference-label">Tooltip theme</span>
-        <select id="tooltipTheme" class="preference-select theme-select">
+        <span class="preference-label" id="tooltipThemeLabel">Tooltip theme</span>
+        <select id="tooltipTheme" class="preference-select theme-select" aria-labelledby="tooltipThemeLabel">
           <optgroup label="Gradients">
             <option value="purple-gradient" selected>Purple</option>
             <option value="ocean-gradient">Ocean Blue</option>
@@ -103,8 +103,8 @@
       </div>
 
       <div class="preference-row">
-        <span class="preference-label">Result display gradient</span>
-        <select id="resultGradient" class="preference-select theme-select">
+        <span class="preference-label" id="resultGradientLabel">Result display gradient</span>
+        <select id="resultGradient" class="preference-select theme-select" aria-labelledby="resultGradientLabel">
           <option value="purple-orange" selected>Purple</option>
           <option value="ocean-blue">Ocean</option>
           <option value="sunset">Sunset</option>
@@ -118,9 +118,9 @@
       </div>
 
       <div class="preference-row">
-        <span class="preference-label">Enable on all websites</span>
+        <span class="preference-label" id="enableToggleLabel">Enable on all websites</span>
         <label class="toggle">
-          <input type="checkbox" id="enableToggle" checked>
+          <input type="checkbox" id="enableToggle" checked aria-labelledby="enableToggleLabel">
           <span class="slider"></span>
         </label>
       </div>
