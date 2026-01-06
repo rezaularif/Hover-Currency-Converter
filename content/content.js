@@ -1,4 +1,8 @@
 (function() {
+  // Prevent double initialization
+  if (window.__hccInitialized) return;
+  window.__hccInitialized = true;
+
   // Currency symbols only (removed unused 'name' field to save memory)
   const CURRENCY_SYMBOLS = {
     AED: '🇦🇪 د.إ', AFN: '🇦🇫 Af', ALL: '🇦🇱 L', AMD: '🇦🇲 ֏', ANG: '🇦🇼 ƒ',
@@ -45,15 +49,20 @@
     'zł': 'PLN', 'Kč': 'CZK', 'kr': 'SEK', 'CHF': 'CHF'
   };
 
+  // Valid currency codes for validation
+  const VALID_CURRENCY_CODES = new Set(Object.keys(CURRENCY_SYMBOLS));
+
   // Pre-compiled regex patterns for US format (1,234.56)
-  const REGEX_SYMBOL_BEFORE = /([$€£¥₹₩₺฿₱₪৳₨₽₸₮₭₾₦₲₴₫₡₵﷼])\s?([\d,]+(?:\.\d{1,2})?)/;
-  const REGEX_SYMBOL_AFTER = /([\d,]+(?:\.\d{1,2})?)\s?([$€£¥₹₩₺฿₱₪৳₨₽₸₮₭₾₦₲₴₫₡₵﷼])/;
-  const REGEX_CODE_AFTER = /([\d,]+(?:\.\d{1,2})?)\s?([A-Z]{3})\b/;
+  const REGEX_SYMBOL_BEFORE = /([$€£¥₹₩₺฿₱₪৳₨₽₸₮₭₾₦₲₴₫₡₵﷼])\s*([\d,]+(?:\.\d{1,2})?)/;
+  const REGEX_SYMBOL_AFTER = /([\d,]+(?:\.\d{1,2})?)\s*([$€£¥₹₩₺฿₱₪৳₨₽₸₮₭₾₦₲₴₫₡₵﷼])/;
+  const REGEX_CODE_AFTER = /([\d,]+(?:\.\d{1,2})?)\s*([A-Z]{3})\b/;
+  const REGEX_CODE_BEFORE = /\b([A-Z]{3})\s*([\d,]+(?:\.\d{1,2})?)/;
 
   // Pre-compiled regex patterns for European format (1.234,56)
-  const REGEX_SYMBOL_BEFORE_EU = /([$€£¥₹₩₺฿₱₪৳₨₽₸₮₭₾₦₲₴₫₡₵﷼])\s?([\d.]+(?:,\d{1,2})?)/;
-  const REGEX_SYMBOL_AFTER_EU = /([\d.]+(?:,\d{1,2})?)\s?([$€£¥₹₩₺฿₱₪৳₨₽₸₮₭₾₦₲₴₫₡₵﷼])/;
-  const REGEX_CODE_AFTER_EU = /([\d.]+(?:,\d{1,2})?)\s?([A-Z]{3})\b/;
+  const REGEX_SYMBOL_BEFORE_EU = /([$€£¥₹₩₺฿₱₪৳₨₽₸₮₭₾₦₲₴₫₡₵﷼])\s*([\d.]+(?:,\d{1,2})?)/;
+  const REGEX_SYMBOL_AFTER_EU = /([\d.]+(?:,\d{1,2})?)\s*([$€£¥₹₩₺฿₱₪৳₨₽₸₮₭₾₦₲₴₫₡₵﷼])/;
+  const REGEX_CODE_AFTER_EU = /([\d.]+(?:,\d{1,2})?)\s*([A-Z]{3})\b/;
+  const REGEX_CODE_BEFORE_EU = /\b([A-Z]{3})\s*([\d.]+(?:,\d{1,2})?)/;
  
   let tooltip = null;
   let targetCurrency = 'EUR';
@@ -66,14 +75,25 @@
   let lastMoveTime = 0;
   let listenersAttached = false;
   let hideTimeout = null;
-  let mouseOverTimeout = null;
 
-  // Performance: Debounce utility for mouseover events
-  function debounce(fn, delay) {
-    let timer;
+  // Throttle utility for mouseover (faster than debounce for responsiveness)
+  function throttle(fn, delay) {
+    let lastCall = 0;
+    let timeout = null;
     return function(...args) {
-      clearTimeout(timer);
-      timer = setTimeout(() => fn.apply(this, args), delay);
+      const now = Date.now();
+      const remaining = delay - (now - lastCall);
+      
+      if (remaining <= 0) {
+        lastCall = now;
+        fn.apply(this, args);
+      } else if (!timeout) {
+        timeout = setTimeout(() => {
+          lastCall = Date.now();
+          timeout = null;
+          fn.apply(this, args);
+        }, remaining);
+      }
     };
   }
  
@@ -195,32 +215,48 @@
       currentElement.classList.remove('hcc-highlight');
       currentElement = null;
     }
-   }
+  }
  
   function parseCurrency(text) {
     let match, currency, amount;
 
     // Try US format first (1,234.56)
+    // Symbol before amount: $100
     if ((match = text.match(REGEX_SYMBOL_BEFORE))) {
       currency = SYMBOL_TO_CURRENCY[match[1]];
       amount = parseFloat(match[2].replace(/,/g, ''));
-    } else if ((match = text.match(REGEX_SYMBOL_AFTER))) {
+    } 
+    // Symbol after amount: 100$
+    else if ((match = text.match(REGEX_SYMBOL_AFTER))) {
       currency = SYMBOL_TO_CURRENCY[match[2]];
       amount = parseFloat(match[1].replace(/,/g, ''));
-    } else if ((match = text.match(REGEX_CODE_AFTER))) {
+    } 
+    // Code before amount: USD 100
+    else if ((match = text.match(REGEX_CODE_BEFORE))) {
+      currency = match[1];
+      if (!VALID_CURRENCY_CODES.has(currency)) currency = null;
+      amount = parseFloat(match[2].replace(/,/g, ''));
+    }
+    // Code after amount: 100 USD
+    else if ((match = text.match(REGEX_CODE_AFTER))) {
       currency = match[2];
+      if (!VALID_CURRENCY_CODES.has(currency)) currency = null;
       amount = parseFloat(match[1].replace(/,/g, ''));
     }
     // Try European format (1.234,56) - only if US format didn't match
     else if ((match = text.match(REGEX_SYMBOL_BEFORE_EU))) {
       currency = SYMBOL_TO_CURRENCY[match[1]];
-      // Convert European format: remove dots (thousands), replace comma with dot (decimal)
       amount = parseFloat(match[2].replace(/\./g, '').replace(',', '.'));
     } else if ((match = text.match(REGEX_SYMBOL_AFTER_EU))) {
       currency = SYMBOL_TO_CURRENCY[match[2]];
       amount = parseFloat(match[1].replace(/\./g, '').replace(',', '.'));
+    } else if ((match = text.match(REGEX_CODE_BEFORE_EU))) {
+      currency = match[1];
+      if (!VALID_CURRENCY_CODES.has(currency)) currency = null;
+      amount = parseFloat(match[2].replace(/\./g, '').replace(',', '.'));
     } else if ((match = text.match(REGEX_CODE_AFTER_EU))) {
       currency = match[2];
+      if (!VALID_CURRENCY_CODES.has(currency)) currency = null;
       amount = parseFloat(match[1].replace(/\./g, '').replace(',', '.'));
     }
 
@@ -231,16 +267,24 @@
     return null;
   }
  
-  function findCurrencyInText(element, x, y) {
-    // Check element text for currency (limited to 1 level to avoid false matches)
+  function findCurrencyInText(element) {
+    // First, try to find currency in the element's own text (excluding children)
+    // This is more accurate for nested structures
+    const directText = getDirectTextContent(element);
+    if (directText && directText.length <= 50) {
+      const parsed = parseCurrency(directText);
+      if (parsed) return parsed;
+    }
+
+    // Check element and ancestors up to 3 levels
     let current = element;
     let depth = 0;
-    const maxDepth = 1;
+    const maxDepth = 3;
 
     while (current && current !== document.body && depth < maxDepth) {
       const text = current.textContent?.trim();
-      // Increased limit from 50 to 100 characters
-      if (text && text.length <= 100) {
+      // Check up to 200 characters
+      if (text && text.length <= 200) {
         const parsed = parseCurrency(text);
         if (parsed) return parsed;
       }
@@ -248,6 +292,17 @@
       depth++;
     }
     return null;
+  }
+
+  // Get only direct text content of an element (not from children)
+  function getDirectTextContent(element) {
+    let text = '';
+    for (const node of element.childNodes) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        text += node.textContent;
+      }
+    }
+    return text.trim();
   }
  
   function handleMouseOver(e) {
@@ -264,7 +319,7 @@
 
     if (target === currentElement) return;
     
-    const parsed = findCurrencyInText(target, e.clientX, e.clientY);
+    const parsed = findCurrencyInText(target);
     
     if (parsed && parsed.currency !== targetCurrency) {
       clearCurrentElement();
@@ -293,11 +348,11 @@
   function handleMouseOut(e) {
     const target = e.target;
     if (target === currentElement) {
-      // Debounce: delay hide by 150ms to prevent flickering
+      // Debounce: delay hide by 100ms to prevent flickering
       hideTimeout = setTimeout(() => {
         hideTooltip();
         hideTimeout = null;
-      }, 150);
+      }, 100);
     }
   }
  
@@ -329,39 +384,109 @@
       }
     }
   }
- 
-  // Performance: Create debounced version of handleMouseOver (100ms delay)
-  let debouncedMouseOver = null;
+
+  // Keyboard accessibility: handle focus events for screen readers and keyboard users
+  function handleFocus(e) {
+    if (!enabled) return;
+
+    const target = e.target;
+    if (target === tooltip) return;
+
+    const parsed = findCurrencyInText(target);
+
+    if (parsed && parsed.currency !== targetCurrency) {
+      clearCurrentElement();
+
+      currentElement = target;
+      target.classList.add('hcc-highlight');
+
+      pendingRequest = target;
+
+      chrome.runtime.sendMessage({
+        type: 'convert',
+        amount: parsed.amount,
+        fromCurrency: parsed.currency,
+        toCurrency: targetCurrency
+      }, response => {
+        if (response?.success && pendingRequest === target && currentElement === target) {
+          const rect = target.getBoundingClientRect();
+          const x = rect.left + rect.width / 2;
+          const y = rect.bottom;
+          showTooltip(x, y, parsed.amount, response.converted, parsed.currency, targetCurrency, response.decimals);
+        }
+      });
+    }
+  }
+
+  function handleBlur(e) {
+    const target = e.target;
+    if (target === currentElement) {
+      hideTimeout = setTimeout(() => {
+        hideTooltip();
+        hideTimeout = null;
+      }, 100);
+    }
+  }
+
+  function handleKeyDown(e) {
+    if (!enabled) return;
+
+    if (e.key === 'Escape' && tooltip?.classList.contains('visible')) {
+      hideTooltip();
+      return;
+    }
+
+    if (e.key === 'Enter' && document.activeElement) {
+      const target = document.activeElement;
+      const parsed = findCurrencyInText(target);
+
+      if (parsed && parsed.currency !== targetCurrency) {
+        if (currentElement === target && tooltip?.classList.contains('visible')) {
+          hideTooltip();
+        } else {
+          handleFocus({ target });
+        }
+      }
+    }
+  }
+
+  // Use throttle instead of debounce for faster response (50ms)
+  let throttledMouseOver = null;
 
   function attachListeners() {
     if (listenersAttached) return;
     createTooltip();
 
-    // Use debounced mouseover for performance
-    debouncedMouseOver = debounce(handleMouseOver, 100);
+    // Use throttle for faster response (50ms)
+    throttledMouseOver = throttle(handleMouseOver, 50);
 
-    document.addEventListener('mouseover', debouncedMouseOver, true);
+    document.addEventListener('mouseover', throttledMouseOver, true);
     document.addEventListener('mouseout', handleMouseOut, true);
     document.addEventListener('mousemove', handleMouseMove, true);
+    document.addEventListener('focusin', handleFocus, true);
+    document.addEventListener('focusout', handleBlur, true);
+    document.addEventListener('keydown', handleKeyDown, true);
     listenersAttached = true;
   }
 
   function detachListeners() {
     if (!listenersAttached) return;
-    // Clear any pending hide timeout
     if (hideTimeout) {
       clearTimeout(hideTimeout);
       hideTimeout = null;
     }
-    document.removeEventListener('mouseover', debouncedMouseOver, true);
+    document.removeEventListener('mouseover', throttledMouseOver, true);
     document.removeEventListener('mouseout', handleMouseOut, true);
     document.removeEventListener('mousemove', handleMouseMove, true);
+    document.removeEventListener('focusin', handleFocus, true);
+    document.removeEventListener('focusout', handleBlur, true);
+    document.removeEventListener('keydown', handleKeyDown, true);
     hideTooltip();
     listenersAttached = false;
   }
 
   function init() {
-    // Load all settings in one call with defaults (Issue 3: Storage initialization)
+    // Load all settings in one call with defaults
     chrome.storage.sync.get({
       targetCurrency: 'EUR',
       enabled: true

@@ -184,7 +184,7 @@ chrome.action.onClicked.addListener(async (tab) => {
   }
 });
 
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener((details) => {
   chrome.storage.sync.set({
     targetCurrency: 'EUR',
     enabled: true
@@ -197,5 +197,15 @@ chrome.runtime.onInstalled.addListener(() => {
     tooltipTheme: 'purple-gradient'
   });
 
+  fetchRates();
+
+  // Show welcome page on first install only
+  if (details.reason === 'install') {
+    chrome.tabs.create({ url: 'welcome/welcome.html' });
+  }
+});
+
+// Pre-fetch rates when browser starts (for faster first conversion)
+chrome.runtime.onStartup.addListener(() => {
   fetchRates();
 });
