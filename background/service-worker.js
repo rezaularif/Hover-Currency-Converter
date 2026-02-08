@@ -155,53 +155,120 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-// Inject content script and open side panel when extension icon is clicked
+const DEFAULT_SYNC_SETTINGS = {
+  targetCurrency: 'EUR',
+  fromCurrency: 'USD',
+  enabled: true,
+  disabledSites: []
+};
+
+const DEFAULT_LOCAL_SETTINGS = {
+  decimalPlaces: 2,
+  tooltipPosition: 'below',
+  tooltipTheme: 'purple-gradient',
+  resultGradient: 'purple-orange',
+  targetCurrencyBackup: 'EUR',
+  fromCurrencyBackup: 'USD'
+};
+
+function normalizeCurrencyCode(value) {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(normalized) ? normalized : null;
+}
+
+// Inject content script if needed and open side panel when extension icon is clicked
 chrome.action.onClicked.addListener(async (tab) => {
-  // Open side panel first
   try {
     await chrome.sidePanel.open({ windowId: tab.windowId });
   } catch (error) {
     console.error('Failed to open side panel:', error);
   }
-  
-  // Inject content script and CSS into the active tab (if possible)
-  // Only inject on http/https pages, skip chrome:// and other restricted pages
-  if (tab.url && (tab.url.startsWith('http://') || tab.url.startsWith('https://'))) {
+
+  if (tab.id && tab.url && (tab.url.startsWith('http://') || tab.url.startsWith('https://'))) {
+    let isContentReady = false;
+
     try {
-      await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        files: ['content/content.js']
-      });
-      
-      await chrome.scripting.insertCSS({
-        target: { tabId: tab.id },
-        files: ['content/content.css']
-      });
+      const pingResponse = await chrome.tabs.sendMessage(tab.id, { type: 'hcc:ping' });
+      isContentReady = !!pingResponse?.ready;
     } catch (error) {
-      // Ignore errors for restricted pages
-      console.log('Could not inject script:', error);
+      isContentReady = false;
+    }
+
+    if (!isContentReady) {
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ['content/content.js']
+        });
+
+        await chrome.scripting.insertCSS({
+          target: { tabId: tab.id },
+          files: ['content/content.css']
+        });
+      } catch (error) {
+        console.log('Could not inject script:', error);
+      }
     }
   }
 });
 
-chrome.runtime.onInstalled.addListener((details) => {
-  chrome.storage.sync.set({
-    targetCurrency: 'EUR',
-    enabled: true
-  });
+chrome.runtime.onInstalled.addListener(async (details) => {
+  try {
+    if (details.reason === 'install') {
+      await chrome.storage.sync.set(DEFAULT_SYNC_SETTINGS);
+      await chrome.storage.local.set(DEFAULT_LOCAL_SETTINGS);
+      chrome.tabs.create({ url: 'welcome/welcome.html' });
+    } else {
+      const [syncValues, localValues] = await Promise.all([
+        chrome.storage.sync.get({
+          targetCurrency: null,
+          fromCurrency: null,
+          enabled: null,
+          disabledSites: null
+        }),
+        chrome.storage.local.get({
+          decimalPlaces: null,
+          tooltipPosition: null,
+          tooltipTheme: null,
+          resultGradient: null,
+          targetCurrencyBackup: null,
+          fromCurrencyBackup: null
+        })
+      ]);
 
-  // Set default user preferences
-  chrome.storage.local.set({
-    decimalPlaces: 2,
-    tooltipPosition: 'below',
-    tooltipTheme: 'purple-gradient'
-  });
+      const syncTarget = normalizeCurrencyCode(syncValues.targetCurrency);
+      const syncFrom = normalizeCurrencyCode(syncValues.fromCurrency);
+      const localTarget = normalizeCurrencyCode(localValues.targetCurrencyBackup);
+      const localFrom = normalizeCurrencyCode(localValues.fromCurrencyBackup);
 
-  fetchRates();
+      const syncUpdates = {};
+      if (!syncTarget) syncUpdates.targetCurrency = localTarget || DEFAULT_SYNC_SETTINGS.targetCurrency;
+      if (!syncFrom) syncUpdates.fromCurrency = localFrom || DEFAULT_SYNC_SETTINGS.fromCurrency;
+      if (typeof syncValues.enabled !== 'boolean') syncUpdates.enabled = DEFAULT_SYNC_SETTINGS.enabled;
+      if (!Array.isArray(syncValues.disabledSites)) syncUpdates.disabledSites = DEFAULT_SYNC_SETTINGS.disabledSites;
+      if (Object.keys(syncUpdates).length > 0) {
+        await chrome.storage.sync.set(syncUpdates);
+      }
 
-  // Show welcome page on first install only
-  if (details.reason === 'install') {
-    chrome.tabs.create({ url: 'welcome/welcome.html' });
+      const effectiveTarget = syncTarget || syncUpdates.targetCurrency || DEFAULT_SYNC_SETTINGS.targetCurrency;
+      const effectiveFrom = syncFrom || syncUpdates.fromCurrency || DEFAULT_SYNC_SETTINGS.fromCurrency;
+
+      const localUpdates = {};
+      if (localValues.decimalPlaces === null) localUpdates.decimalPlaces = DEFAULT_LOCAL_SETTINGS.decimalPlaces;
+      if (localValues.tooltipPosition === null) localUpdates.tooltipPosition = DEFAULT_LOCAL_SETTINGS.tooltipPosition;
+      if (localValues.tooltipTheme === null) localUpdates.tooltipTheme = DEFAULT_LOCAL_SETTINGS.tooltipTheme;
+      if (localValues.resultGradient === null) localUpdates.resultGradient = DEFAULT_LOCAL_SETTINGS.resultGradient;
+      if (!localTarget) localUpdates.targetCurrencyBackup = effectiveTarget;
+      if (!localFrom) localUpdates.fromCurrencyBackup = effectiveFrom;
+      if (Object.keys(localUpdates).length > 0) {
+        await chrome.storage.local.set(localUpdates);
+      }
+    }
+  } catch (error) {
+    console.error('Failed to initialize extension settings:', error);
+  } finally {
+    fetchRates();
   }
 });
 

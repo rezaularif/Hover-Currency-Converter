@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Hover Currency Converter",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Convert currency prices on hover - see converted values instantly when hovering over prices",
   "permissions": ["storage", "sidePanel", "activeTab", "scripting"],
   "host_permissions": [

@@ -5,7 +5,7 @@
 </div>
 
 [![Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-Available-brightgreen)](https://chromewebstore.google.com/detail/hover-currency-converter/plbdgcecigogedfihfmabohdbbbokfka)
-[![Version](https://img.shields.io/badge/version-1.0.1-blue)](https://chromewebstore.google.com/detail/hover-currency-converter/plbdgcecigogedfihfmabohdbbbokfka)
+[![Version](https://img.shields.io/badge/version-1.0.5-blue)](https://chromewebstore.google.com/detail/hover-currency-converter/plbdgcecigogedfihfmabohdbbbokfka)
 
 <div align="center">
   <img src="screenshots/banner.png" alt="Hover Currency Converter Banner" width="100%">
@@ -82,8 +82,6 @@ Hover-Currency-Converter/
 │   ├── sidepanel.html       # Side panel UI
 │   ├── sidepanel.js         # Side panel logic
 │   └── sidepanel.css        # Side panel styles
-├── utils/
-│   └── currencies.js        # Currency utilities
 ├── icons/                   # Extension icons
 ├── screenshots/             # Screenshots and banners
 ├── manifest.json            # Extension manifest
@@ -120,4 +118,3 @@ If you encounter any issues or have suggestions, please:
 ---
 
 **Made with ❤️ for easier online shopping and browsing**
-

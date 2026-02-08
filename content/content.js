@@ -1,9 +1,7 @@
 (function() {
-  // Prevent double initialization
   if (window.__hccInitialized) return;
   window.__hccInitialized = true;
 
-  // Currency symbols only (removed unused 'name' field to save memory)
   const CURRENCY_SYMBOLS = {
     AED: '🇦🇪 د.إ', AFN: '🇦🇫 Af', ALL: '🇦🇱 L', AMD: '🇦🇲 ֏', ANG: '🇦🇼 ƒ',
     AOA: '🇦🇴 Kz', ARS: '🇦🇷 $', AUD: '🇦🇺 A$', AWG: '🇦🇼 ƒ', AZN: '🇦🇿 ₼',
@@ -20,11 +18,11 @@
     INR: '🇮🇳 ₹', IQD: '🇮🇶 ع.د', IRR: '🇮🇷 ﷼', ISK: '🇮🇸 kr', JMD: '🇯🇲 $',
     JOD: '🇯🇴 د.ا', JPY: '🇯🇵 ¥', KES: '🇰🇪 KSh', KGS: '🇰🇬 сом', KHR: '🇰🇭 ៛',
     KMF: '🇰🇲 Fr', KRW: '🇰🇷 ₩', KWD: '🇰🇼 د.ك', KYD: '🇰🇾 $', KZT: '🇰🇿 ₸',
-    LAK: '🇱🇷 ₭', LBP: '🇱🇧 ل.ل', LKR: '🇱🇰 Rs', LRD: '🇱🇷 $', LSL: '🇱🇸 L',
+    LAK: '🇱🇦 ₭', LBP: '🇱🇧 ل.ل', LKR: '🇱🇰 Rs', LRD: '🇱🇷 $', LSL: '🇱🇸 L',
     LYD: '🇱🇾 ل.د', MAD: '🇲🇦 د.م.', MDL: '🇲🇩 L', MGA: '🇲🇬 Ar', MKD: '🇲🇰 ден',
     MMK: '🇲🇲 K', MNT: '🇲🇳 ₮', MOP: '🇲🇴 P', MRU: '🇲🇷 UM', MUR: '🇲🇺 Rs',
     MVR: '🇲🇻 .MRf', MWK: '🇲🇼 MK', MXN: '🇲🇽 $', MYR: '🇲🇾 RM', MZN: '🇲🇿 MT',
-    NAD: '🇳🇦 $', NGN: '🇳🇬 ₦', NIO: '🇳🇪 C$', NOK: '🇳🇴 kr', NPR: '🇳🇵 Rs',
+    NAD: '🇳🇦 $', NGN: '🇳🇬 ₦', NIO: '🇳🇮 C$', NOK: '🇳🇴 kr', NPR: '🇳🇵 Rs',
     NZD: '🇳🇿 NZ$', OMR: '🇴🇲 ر.ع.', PAB: '🇵🇦 B/.', PEN: '🇵🇪 S/', PGK: '🇵🇬 K',
     PHP: '🇵🇭 ₱', PKR: '🇵🇰 ₨', PLN: '🇵🇱 zł', PYG: '🇵🇾 ₲', QAR: '🇶🇦 ر.ق',
     RON: '🇷🇴 lei', RSD: '🇷🇸 дин.', RUB: '🇷🇺 ₽', RWF: '🇷🇼 Fr', SAR: '🇸🇦 ر.س',
@@ -39,7 +37,6 @@
     YER: '🇾🇪 ﷼', ZAR: '🇿🇦 R', ZMW: '🇿🇲 ZK', ZWL: '🇿🇼 $'
   };
 
-  // Expanded symbol to currency mapping (including additional symbols)
   const SYMBOL_TO_CURRENCY = {
     '$': 'USD', '€': 'EUR', '£': 'GBP', '¥': 'JPY', '₹': 'INR',
     '₩': 'KRW', '₺': 'TRY', '฿': 'THB', '₱': 'PHP', '₪': 'ILS',
@@ -49,24 +46,32 @@
     'zł': 'PLN', 'Kč': 'CZK', 'kr': 'SEK', 'CHF': 'CHF'
   };
 
-  // Valid currency codes for validation
   const VALID_CURRENCY_CODES = new Set(Object.keys(CURRENCY_SYMBOLS));
 
-  // Pre-compiled regex patterns for US format (1,234.56)
   const REGEX_SYMBOL_BEFORE = /([$€£¥₹₩₺฿₱₪৳₨₽₸₮₭₾₦₲₴₫₡₵﷼])\s*([\d,]+(?:\.\d{1,2})?)/;
   const REGEX_SYMBOL_AFTER = /([\d,]+(?:\.\d{1,2})?)\s*([$€£¥₹₩₺฿₱₪৳₨₽₸₮₭₾₦₲₴₫₡₵﷼])/;
   const REGEX_CODE_AFTER = /([\d,]+(?:\.\d{1,2})?)\s*([A-Z]{3})\b/;
   const REGEX_CODE_BEFORE = /\b([A-Z]{3})\s*([\d,]+(?:\.\d{1,2})?)/;
 
-  // Pre-compiled regex patterns for European format (1.234,56)
   const REGEX_SYMBOL_BEFORE_EU = /([$€£¥₹₩₺฿₱₪৳₨₽₸₮₭₾₦₲₴₫₡₵﷼])\s*([\d.]+(?:,\d{1,2})?)/;
   const REGEX_SYMBOL_AFTER_EU = /([\d.]+(?:,\d{1,2})?)\s*([$€£¥₹₩₺฿₱₪৳₨₽₸₮₭₾₦₲₴₫₡₵﷼])/;
   const REGEX_CODE_AFTER_EU = /([\d.]+(?:,\d{1,2})?)\s*([A-Z]{3})\b/;
   const REGEX_CODE_BEFORE_EU = /\b([A-Z]{3})\s*([\d.]+(?:,\d{1,2})?)/;
- 
+  const DEFAULT_TARGET_CURRENCY = 'EUR';
+  const MULTI_PART_TLDS = new Set([
+    'co.uk', 'org.uk', 'gov.uk', 'ac.uk',
+    'com.au', 'net.au', 'org.au',
+    'co.nz', 'co.jp', 'co.kr', 'co.in', 'co.id', 'co.za',
+    'com.br', 'com.mx', 'com.tr', 'com.sg', 'com.hk', 'com.cn', 'com.tw', 'com.ar', 'com.sa', 'com.eg', 'com.ng'
+  ]);
+
   let tooltip = null;
-  let targetCurrency = 'EUR';
+  let targetCurrency = DEFAULT_TARGET_CURRENCY;
+  let syncTargetCurrency = null;
+  let localTargetCurrencyBackup = null;
   let enabled = true;
+  let siteEnabled = true;
+  let disabledSites = [];
   let currentElement = null;
   let pendingRequest = null;
   let decimalPlaces = 2;
@@ -76,14 +81,12 @@
   let listenersAttached = false;
   let hideTimeout = null;
 
-  // Throttle utility for mouseover (faster than debounce for responsiveness)
   function throttle(fn, delay) {
     let lastCall = 0;
     let timeout = null;
     return function(...args) {
       const now = Date.now();
       const remaining = delay - (now - lastCall);
-      
       if (remaining <= 0) {
         lastCall = now;
         fn.apply(this, args);
@@ -96,7 +99,7 @@
       }
     };
   }
- 
+
   function createTooltip() {
     if (tooltip) return;
     tooltip = document.createElement('div');
@@ -105,37 +108,26 @@
     tooltip.setAttribute('aria-live', 'polite');
     document.body.appendChild(tooltip);
   }
- 
+
   function showTooltip(x, y, original, converted, fromCode, toCode, serverDecimals) {
     if (!tooltip) createTooltip();
-
     const fromSymbol = CURRENCY_SYMBOLS[fromCode] || fromCode;
     const toSymbol = CURRENCY_SYMBOLS[toCode] || toCode;
-
-    // Use server-provided decimals (ISO 4217) if available, otherwise fall back to user preference
     const displayDecimals = serverDecimals !== undefined ? serverDecimals : decimalPlaces;
-
-    // Security: Use textContent instead of innerHTML to prevent XSS
     tooltip.textContent = '';
-
     const originalSpan = document.createElement('span');
     originalSpan.className = 'hcc-original';
     originalSpan.textContent = `${fromSymbol}${original.toLocaleString()}`;
-
     const arrowSpan = document.createElement('span');
     arrowSpan.className = 'hcc-arrow';
     arrowSpan.textContent = '→';
-
     const convertedSpan = document.createElement('span');
     convertedSpan.className = 'hcc-converted';
     convertedSpan.textContent = `${toSymbol}${converted.toLocaleString(undefined, { minimumFractionDigits: displayDecimals, maximumFractionDigits: displayDecimals })}`;
-
     tooltip.appendChild(originalSpan);
     tooltip.appendChild(arrowSpan);
     tooltip.appendChild(convertedSpan);
-
     positionTooltip(x, y);
-
     requestAnimationFrame(() => {
       tooltip.classList.add('visible');
     });
@@ -147,9 +139,7 @@
     const tooltipWidth = 200;
     const tooltipHeight = 50;
     const offset = 15;
-
     let left, top;
-
     switch (tooltipPosition) {
       case 'above':
         left = x;
@@ -171,8 +161,6 @@
         left = x;
         top = y + offset;
     }
-
-    // Boundary checks to keep tooltip on screen
     if (left + tooltipWidth > viewportWidth) {
       left = viewportWidth - tooltipWidth - 10;
     }
@@ -185,21 +173,16 @@
     if (top < 10) {
       top = 10;
     }
-
     tooltip.style.left = `${left}px`;
     tooltip.style.top = `${top}px`;
-
-    // Update position and theme classes
     tooltip.classList.remove('hcc-pos-above', 'hcc-pos-below', 'hcc-pos-left', 'hcc-pos-right');
     tooltip.classList.add(`hcc-pos-${tooltipPosition}`);
-
-    // Apply theme (remove old theme classes, add current)
     tooltip.className = tooltip.className.replace(/hcc-theme-[\w-]+/g, '').trim();
     if (tooltipTheme !== 'purple-gradient') {
       tooltip.classList.add(`hcc-theme-${tooltipTheme}`);
     }
   }
- 
+
   function hideTooltip() {
     if (tooltip) {
       tooltip.classList.remove('visible');
@@ -216,35 +199,24 @@
       currentElement = null;
     }
   }
- 
+
   function parseCurrency(text) {
     let match, currency, amount;
-
-    // Try US format first (1,234.56)
-    // Symbol before amount: $100
     if ((match = text.match(REGEX_SYMBOL_BEFORE))) {
       currency = SYMBOL_TO_CURRENCY[match[1]];
       amount = parseFloat(match[2].replace(/,/g, ''));
-    } 
-    // Symbol after amount: 100$
-    else if ((match = text.match(REGEX_SYMBOL_AFTER))) {
+    } else if ((match = text.match(REGEX_SYMBOL_AFTER))) {
       currency = SYMBOL_TO_CURRENCY[match[2]];
       amount = parseFloat(match[1].replace(/,/g, ''));
-    } 
-    // Code before amount: USD 100
-    else if ((match = text.match(REGEX_CODE_BEFORE))) {
+    } else if ((match = text.match(REGEX_CODE_BEFORE))) {
       currency = match[1];
       if (!VALID_CURRENCY_CODES.has(currency)) currency = null;
       amount = parseFloat(match[2].replace(/,/g, ''));
-    }
-    // Code after amount: 100 USD
-    else if ((match = text.match(REGEX_CODE_AFTER))) {
+    } else if ((match = text.match(REGEX_CODE_AFTER))) {
       currency = match[2];
       if (!VALID_CURRENCY_CODES.has(currency)) currency = null;
       amount = parseFloat(match[1].replace(/,/g, ''));
-    }
-    // Try European format (1.234,56) - only if US format didn't match
-    else if ((match = text.match(REGEX_SYMBOL_BEFORE_EU))) {
+    } else if ((match = text.match(REGEX_SYMBOL_BEFORE_EU))) {
       currency = SYMBOL_TO_CURRENCY[match[1]];
       amount = parseFloat(match[2].replace(/\./g, '').replace(',', '.'));
     } else if ((match = text.match(REGEX_SYMBOL_AFTER_EU))) {
@@ -259,31 +231,23 @@
       if (!VALID_CURRENCY_CODES.has(currency)) currency = null;
       amount = parseFloat(match[1].replace(/\./g, '').replace(',', '.'));
     }
-
     if (currency && !isNaN(amount) && amount > 0) {
       return { currency, amount };
     }
-
     return null;
   }
- 
+
   function findCurrencyInText(element) {
-    // First, try to find currency in the element's own text (excluding children)
-    // This is more accurate for nested structures
     const directText = getDirectTextContent(element);
     if (directText && directText.length <= 50) {
       const parsed = parseCurrency(directText);
       if (parsed) return parsed;
     }
-
-    // Check element and ancestors up to 3 levels
     let current = element;
     let depth = 0;
     const maxDepth = 3;
-
     while (current && current !== document.body && depth < maxDepth) {
       const text = current.textContent?.trim();
-      // Check up to 200 characters
       if (text && text.length <= 200) {
         const parsed = parseCurrency(text);
         if (parsed) return parsed;
@@ -294,7 +258,6 @@
     return null;
   }
 
-  // Get only direct text content of an element (not from children)
   function getDirectTextContent(element) {
     let text = '';
     for (const node of element.childNodes) {
@@ -304,31 +267,22 @@
     }
     return text.trim();
   }
- 
-  function handleMouseOver(e) {
-    if (!enabled) return;
 
-    // Cancel pending hide when re-entering
+  function handleMouseOver(e) {
+    if (!enabled || !siteEnabled) return;
     if (hideTimeout) {
       clearTimeout(hideTimeout);
       hideTimeout = null;
     }
-
     const target = e.target;
     if (target === tooltip || tooltip?.contains(target)) return;
-
     if (target === currentElement) return;
-    
     const parsed = findCurrencyInText(target);
-    
     if (parsed && parsed.currency !== targetCurrency) {
       clearCurrentElement();
-      
       currentElement = target;
       target.classList.add('hcc-highlight');
-      
       pendingRequest = target;
-      
       chrome.runtime.sendMessage({
         type: 'convert',
         amount: parsed.amount,
@@ -344,29 +298,23 @@
       pendingRequest = null;
     }
   }
- 
+
   function handleMouseOut(e) {
     const target = e.target;
     if (target === currentElement) {
-      // Debounce: delay hide by 100ms to prevent flickering
       hideTimeout = setTimeout(() => {
         hideTooltip();
         hideTimeout = null;
       }, 100);
     }
   }
- 
+
   function handleMouseMove(e) {
     if (!tooltip || !tooltip.classList.contains('visible') || !currentElement) return;
-
-    // Throttle to ~60fps (16ms) to reduce CPU usage
     const now = Date.now();
     if (now - lastMoveTime < 16) return;
     lastMoveTime = now;
-
     positionTooltip(e.clientX, e.clientY);
-
-    // Use bounding box for more reliable cursor position detection
     const rect = currentElement.getBoundingClientRect();
     const inBounds = (
       e.clientX >= rect.left &&
@@ -374,9 +322,7 @@
       e.clientY >= rect.top &&
       e.clientY <= rect.bottom
     );
-
     if (!inBounds) {
-      // Also verify with elementFromPoint as fallback
       const elementUnderCursor = document.elementFromPoint(e.clientX, e.clientY);
       if (elementUnderCursor !== currentElement && !currentElement.contains(elementUnderCursor)) {
         hideTooltip();
@@ -385,23 +331,16 @@
     }
   }
 
-  // Keyboard accessibility: handle focus events for screen readers and keyboard users
   function handleFocus(e) {
-    if (!enabled) return;
-
+    if (!enabled || !siteEnabled) return;
     const target = e.target;
     if (target === tooltip) return;
-
     const parsed = findCurrencyInText(target);
-
     if (parsed && parsed.currency !== targetCurrency) {
       clearCurrentElement();
-
       currentElement = target;
       target.classList.add('hcc-highlight');
-
       pendingRequest = target;
-
       chrome.runtime.sendMessage({
         type: 'convert',
         amount: parsed.amount,
@@ -429,17 +368,14 @@
   }
 
   function handleKeyDown(e) {
-    if (!enabled) return;
-
+    if (!enabled || !siteEnabled) return;
     if (e.key === 'Escape' && tooltip?.classList.contains('visible')) {
       hideTooltip();
       return;
     }
-
     if (e.key === 'Enter' && document.activeElement) {
       const target = document.activeElement;
       const parsed = findCurrencyInText(target);
-
       if (parsed && parsed.currency !== targetCurrency) {
         if (currentElement === target && tooltip?.classList.contains('visible')) {
           hideTooltip();
@@ -450,16 +386,12 @@
     }
   }
 
-  // Use throttle instead of debounce for faster response (50ms)
   let throttledMouseOver = null;
 
   function attachListeners() {
     if (listenersAttached) return;
     createTooltip();
-
-    // Use throttle for faster response (50ms)
     throttledMouseOver = throttle(handleMouseOver, 50);
-
     document.addEventListener('mouseover', throttledMouseOver, true);
     document.addEventListener('mouseout', handleMouseOut, true);
     document.addEventListener('mousemove', handleMouseMove, true);
@@ -485,46 +417,129 @@
     listenersAttached = false;
   }
 
-  function init() {
-    // Load all settings in one call with defaults
-    chrome.storage.sync.get({
-      targetCurrency: 'EUR',
-      enabled: true
-    }, (result) => {
-      targetCurrency = result.targetCurrency;
-      enabled = result.enabled;
+  function normalizeHostname(hostname) {
+    return hostname.toLowerCase().replace(/\.$/, '');
+  }
 
-      if (enabled) {
-        attachListeners();
+  function isIpAddress(hostname) {
+    return /^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname) || hostname.includes(':');
+  }
+
+  function getLegacyRootDomain(hostname) {
+    const normalized = normalizeHostname(hostname);
+    const parts = normalized.split('.');
+    if (parts.length <= 2) return normalized;
+    return parts.slice(-2).join('.');
+  }
+
+  function getRootDomain(hostname) {
+    const normalized = normalizeHostname(hostname);
+    if (!normalized || normalized === 'localhost' || isIpAddress(normalized)) {
+      return normalized;
+    }
+
+    const parts = normalized.split('.');
+    if (parts.length <= 2) {
+      return normalized;
+    }
+
+    const lastTwo = parts.slice(-2).join('.');
+    if (MULTI_PART_TLDS.has(lastTwo) && parts.length >= 3) {
+      return parts.slice(-3).join('.');
+    }
+
+    return lastTwo;
+  }
+
+  function getSiteKeys(hostname) {
+    const rootDomain = getRootDomain(hostname);
+    const legacyRootDomain = getLegacyRootDomain(hostname);
+    if (rootDomain === legacyRootDomain) {
+      return [rootDomain];
+    }
+    return [rootDomain, legacyRootDomain];
+  }
+
+  function normalizeCurrencyCode(value) {
+    if (typeof value !== 'string') return null;
+    const normalized = value.trim().toUpperCase();
+    return /^[A-Z]{3}$/.test(normalized) ? normalized : null;
+  }
+
+  function checkSiteEnabled() {
+    const siteKeys = getSiteKeys(window.location.hostname);
+    siteEnabled = !disabledSites.some(site => siteKeys.includes(site));
+  }
+
+  function updateListenerState() {
+    if (enabled && siteEnabled) {
+      attachListeners();
+    } else {
+      detachListeners();
+    }
+  }
+
+  async function init() {
+    try {
+      const [syncResult, localResult] = await Promise.all([
+        chrome.storage.sync.get({
+          targetCurrency: null,
+          enabled: true,
+          disabledSites: []
+        }),
+        chrome.storage.local.get({
+          targetCurrencyBackup: null,
+          decimalPlaces: 2,
+          tooltipPosition: 'below',
+          tooltipTheme: 'purple-gradient'
+        })
+      ]);
+
+      syncTargetCurrency = normalizeCurrencyCode(syncResult.targetCurrency);
+      localTargetCurrencyBackup = normalizeCurrencyCode(localResult.targetCurrencyBackup);
+      targetCurrency = syncTargetCurrency || localTargetCurrencyBackup || DEFAULT_TARGET_CURRENCY;
+
+      if (!syncTargetCurrency && localTargetCurrencyBackup) {
+        chrome.storage.sync.set({ targetCurrency: localTargetCurrencyBackup }).catch(error => {
+          console.error('Failed to repair sync target currency:', error);
+        });
       }
-    });
 
-    // Load local preferences with defaults
-    chrome.storage.local.get({
-      decimalPlaces: 2,
-      tooltipPosition: 'below',
-      tooltipTheme: 'purple-gradient'
-    }, (result) => {
-      decimalPlaces = result.decimalPlaces;
-      tooltipPosition = result.tooltipPosition;
-      tooltipTheme = result.tooltipTheme;
-    });
+      enabled = syncResult.enabled;
+      disabledSites = syncResult.disabledSites;
+      checkSiteEnabled();
+      updateListenerState();
 
-    // Listen for changes
+      decimalPlaces = localResult.decimalPlaces;
+      tooltipPosition = localResult.tooltipPosition;
+      tooltipTheme = localResult.tooltipTheme;
+    } catch (error) {
+      console.error('Failed to initialize content settings:', error);
+      checkSiteEnabled();
+      updateListenerState();
+    }
+
     chrome.storage.onChanged.addListener((changes, areaName) => {
-      if (changes.targetCurrency) {
-        targetCurrency = changes.targetCurrency.newValue;
+      if (areaName === 'sync' && changes.targetCurrency) {
+        syncTargetCurrency = normalizeCurrencyCode(changes.targetCurrency.newValue);
+        targetCurrency = syncTargetCurrency || localTargetCurrencyBackup || DEFAULT_TARGET_CURRENCY;
       }
-      if (changes.enabled) {
+      if (areaName === 'sync' && changes.enabled) {
         enabled = changes.enabled.newValue;
-        if (enabled) {
-          attachListeners();
-        } else {
-          detachListeners();
-        }
+        updateListenerState();
       }
-
+      if (areaName === 'sync' && changes.disabledSites) {
+        disabledSites = changes.disabledSites.newValue;
+        checkSiteEnabled();
+        updateListenerState();
+      }
       if (areaName === 'local') {
+        if (changes.targetCurrencyBackup) {
+          localTargetCurrencyBackup = normalizeCurrencyCode(changes.targetCurrencyBackup.newValue);
+          if (!syncTargetCurrency) {
+            targetCurrency = localTargetCurrencyBackup || DEFAULT_TARGET_CURRENCY;
+          }
+        }
         if (changes.decimalPlaces) {
           decimalPlaces = changes.decimalPlaces.newValue;
         }
@@ -537,7 +552,13 @@
       }
     });
   }
- 
+
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message?.type === 'hcc:ping') {
+      sendResponse({ ready: true });
+    }
+  });
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {

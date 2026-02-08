@@ -125,18 +125,6 @@ body::after {
   text-align: center;
 }
 
-.toggle-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.toggle-label {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-main);
-}
-
 .toggle {
   position: relative;
   display: inline-block;
@@ -182,86 +170,6 @@ input:checked + .slider {
 input:checked + .slider:before {
   transform: translateX(22px);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.currency-select {
-  width: 100%;
-  max-height: 200px;
-  padding: 12px 14px;
-  font-size: 14px;
-  font-weight: 600;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  background: #f8fafc;
-  color: var(--text-main);
-  cursor: pointer;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
-  transition: all 0.2s ease;
-}
-
-.currency-select:hover {
-  border-color: #cbd5e1;
-  background-color: #f1f5f9;
-}
-
-.currency-select:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.1);
-}
-
-.currency-select[size],
-.currency-select-small[size] {
-  height: auto;
-  max-height: 280px;
-  overflow-y: scroll;
-  overflow-x: hidden;
-  background-image: none;
-  background-color: #ffffff;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
-  padding: 0;
-  border-radius: 12px;
-  opacity: 1;
-}
-
-.currency-select option,
-.currency-select-small option {
-  padding: 10px 14px;
-  font-size: 14px;
-  font-weight: 500;
-  color: #334155;
-  cursor: pointer;
-  border-bottom: 1px solid #f1f5f9;
-  background-color: #ffffff;
-  -webkit-appearance: none;
-  appearance: none;
-}
-
-.currency-select option:hover,
-.currency-select-small option:hover {
-  background-color: #f8fafc;
-}
-
-.currency-select option:checked,
-.currency-select-small option:checked {
-  background: #f1f5f9;
-  color: #0f172a;
-  font-weight: 700;
-}
-
-.currency-select optgroup {
-  font-weight: 800;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: #94a3b8;
-  padding: 12px 14px 6px 14px;
-  margin: 0;
-  background: white;
 }
 
 .converter-section {
@@ -336,31 +244,6 @@ input:checked + .slider:before {
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.1);
-}
-
-.currency-select-small {
-  width: 85px;
-  flex-shrink: 0;
-  padding: 12px 8px;
-  font-size: 13px;
-  font-weight: 800;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  background: #f8fafc;
-  color: var(--text-main);
-  cursor: pointer;
-  appearance: none;
-  text-align: center;
-  transition: all 0.2s ease;
-}
-
-.currency-select-small[size] {
-  position: absolute;
-  right: 0;
-  top: 100%;
-  margin-top: 4px;
-  width: 140px;
-  z-index: 100;
 }
 
 /* Custom dropdown for Quick Convert */
@@ -804,11 +687,6 @@ input:checked + .slider:before {
     flex-wrap: wrap;
   }
   
-  .currency-select-small {
-    width: 100%;
-    margin-top: 8px;
-  }
-  
   .preference-row {
     flex-direction: column;
     align-items: flex-start;
@@ -832,23 +710,6 @@ input:checked + .slider:before {
 
 ::-webkit-scrollbar {
   width: 6px;
-}
-
-.currency-select::-webkit-scrollbar {
-  width: 6px;
-}
-
-.currency-select::-webkit-scrollbar-track {
-  background: #f8fafc;
-}
-
-.currency-select::-webkit-scrollbar-thumb {
-  background: #e2e8f0;
-  border-radius: 3px;
-}
-
-.currency-select::-webkit-scrollbar-thumb:hover {
-  background: #cbd5e1;
 }
 
 ::-webkit-scrollbar-track {

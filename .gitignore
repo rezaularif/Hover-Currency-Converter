@@ -1,6 +1,7 @@
 # Documentation files (except README.md, PRIVACY_POLICY.md, SUPPORT.md)
 *.md
 !README.md
+!CHANGELOG.md
 !PRIVACY_POLICY.md
 !SUPPORT.md
 !AGENTS.md
@@ -19,4 +20,3 @@ Thumbs.db
 *.swp
 *.swo
 *~
-

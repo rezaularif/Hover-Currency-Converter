@@ -33,7 +33,7 @@ const CURRENCY_SYMBOLS = {
   YER: '🇾🇪', ZAR: '🇿🇦', ZMW: '🇿🇲', ZWL: '🇿🇼'
 };
 
-const FIAT_CURRENCIES = new Set([
+const KNOWN_FIAT_CODES = new Set([
   'aed', 'afn', 'all', 'amd', 'ang', 'aoa', 'ars', 'aud', 'awg', 'azn',
   'bam', 'bbd', 'bdt', 'bgn', 'bhd', 'bif', 'bmd', 'bnd', 'bob', 'brl',
   'bsd', 'btn', 'bwp', 'byn', 'bzd', 'cad', 'cdf', 'chf', 'clp', 'cny',
@@ -49,8 +49,8 @@ const FIAT_CURRENCIES = new Set([
   'sgd', 'shp', 'sle', 'sll', 'sos', 'srd', 'ssp', 'std', 'stn', 'syp',
   'szl', 'thb', 'tjs', 'tmt', 'tnd', 'top', 'try', 'ttd', 'twd', 'tzs',
   'uah', 'ugx', 'usd', 'uyu', 'uzs', 'ves', 'vnd', 'vuv', 'wst', 'xaf',
-  'xcd', 'xdr', 'xof', 'xpf', 'yer', 'zar', 'zmw', 'zwl', 'cnh', 'cuc',
-  'ggp', 'imp', 'jep', 'svc', 'tvd', 'xag', 'xau', 'xpd', 'xpt'
+  'xcd', 'xof', 'xpf', 'yer', 'zar', 'zmw', 'zwl', 'cnh', 'cuc',
+  'ggp', 'imp', 'jep', 'svc', 'tvd'
 ]);
 
 // Common cryptocurrency codes to exclude
@@ -60,49 +60,143 @@ const CRYPTO_CURRENCIES = new Set([
   'xmr', 'eos', 'aave', 'mkr', 'comp', 'yfi', 'sushi', 'snx', 'crv', '1inch'
 ]);
 
+const NON_FIAT_ASSET_CODES = new Set(['xag', 'xau', 'xpd', 'xpt', 'xdr']);
+const FIAT_NAME_PATTERNS = [
+  /(?:^|[^a-z])(afghani|ariary|balboa|birr|bol[ií]var|boliviano|cedi|colon|cordoba|denar|dinar|dirham|dobra|dollar|dong|dram|escudo|euro|fils|forint|franc|gourde|guarani|guilder|hryvnia|kip|koruna|krona|krone|kuna|kwacha|kwanza|lari|lats|lek|lempira|leone|lev|lilangeni|lira|litas|loti|manat|mark|metical|naira|ngultrum|ouguiya|pataca|peso|pound|pula|quetzal|rand|real|rial|riyal|riel|ringgit|ruble|rupee|rupiah|shekel|shilling|sol|somoni|som|sterling|taka|tenge|tugrik|vatu|won|yen|yuan|zloty|cfa|cfp)(?:$|[^a-z])/i
+];
+const NON_FIAT_NAME_PATTERNS = [
+  /bitcoin|ethereum|tether|usd coin|dogecoin|binance coin|cryptocurrency|crypto|stablecoin|token|network|protocol|governance|defi|staking|swap|yield|dao/i,
+  /gold|silver|palladium|platinum|precious metal|commodity/i,
+  /special drawing rights/i
+];
+
 const CURRENCIES_API_URL = 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies.json';
+const CURRENCIES_CACHE_DURATION = 24 * 60 * 60 * 1000;
+const DEFAULT_TARGET_CURRENCY = 'EUR';
+const DEFAULT_FROM_CURRENCY = 'USD';
 
 let allCurrencies = null;
 async function fetchCurrencies() {
+  const now = Date.now();
+  const cached = await chrome.storage.local.get({
+    currenciesList: null,
+    currenciesListFetchedAt: 0
+  });
+
   try {
-    const cached = await chrome.storage.local.get('currenciesList');
-    if (cached.currenciesList) {
+    if (
+      cached.currenciesList &&
+      cached.currenciesListFetchedAt &&
+      (now - cached.currenciesListFetchedAt) < CURRENCIES_CACHE_DURATION
+    ) {
       return cached.currenciesList;
     }
+
     const response = await fetch(CURRENCIES_API_URL);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
     const data = await response.json();
-    await chrome.storage.local.set({ currenciesList: data });
+    if (!data || typeof data !== 'object') {
+      throw new Error('Invalid currencies API response');
+    }
+
+    await chrome.storage.local.set({
+      currenciesList: data,
+      currenciesListFetchedAt: now
+    });
     return data;
   } catch (error) {
     console.error('Failed to fetch currencies:', error);
-    return null;
+    return cached.currenciesList || null;
   }
+}
+
+function countryCodeToFlag(countryCode) {
+  if (!/^[A-Z]{2}$/.test(countryCode)) return null;
+  const base = 127397;
+  return String.fromCodePoint(
+    countryCode.charCodeAt(0) + base,
+    countryCode.charCodeAt(1) + base
+  );
 }
 
 function getFlag(code) {
   const upperCode = code.toUpperCase();
-  return CURRENCY_SYMBOLS[upperCode] || '💱';
+  if (CURRENCY_SYMBOLS[upperCode]) {
+    return CURRENCY_SYMBOLS[upperCode];
+  }
+  const derivedFlag = countryCodeToFlag(upperCode.slice(0, 2));
+  return derivedFlag || '💱';
 }
 
 const POPULAR_CURRENCIES = ['usd', 'eur', 'gbp', 'jpy', 'cny', 'inr', 'cad', 'aud', 'chf', 'krw'];
 
-function populateCurrencySelect(selectElement, currencies, selectedValue, isSmall = false) {
-  selectElement.innerHTML = '';
-  
-  // Get all valid fiat currency codes (exclude cryptocurrencies)
-  const allCodes = Object.keys(currencies).filter(code => {
-    const codeLower = code.toLowerCase();
-    return currencies[code] && 
-           typeof currencies[code] === 'string' &&
-           FIAT_CURRENCIES.has(codeLower) &&
-           !CRYPTO_CURRENCIES.has(codeLower);
-  });
-  
-  // Put popular currencies first, then the rest alphabetically
+function isFiatCurrencyEntry(code, name) {
+  if (typeof code !== 'string' || typeof name !== 'string') return false;
+
+  const codeLower = code.toLowerCase();
+  const normalizedName = name.trim().toLowerCase();
+
+  if (!/^[a-z]{3}$/.test(codeLower)) return false;
+  if (CRYPTO_CURRENCIES.has(codeLower)) return false;
+  if (NON_FIAT_ASSET_CODES.has(codeLower)) return false;
+  if (NON_FIAT_NAME_PATTERNS.some(pattern => pattern.test(normalizedName))) return false;
+  if (KNOWN_FIAT_CODES.has(codeLower)) return true;
+  if (!FIAT_NAME_PATTERNS.some(pattern => pattern.test(normalizedName))) return false;
+
+  return true;
+}
+
+function getOrderedFiatCodes(currencies) {
+  const allCodes = Object.entries(currencies)
+    .filter(([code, name]) => isFiatCurrencyEntry(code, name))
+    .map(([code]) => code.toLowerCase());
+
   const popular = POPULAR_CURRENCIES.filter(code => allCodes.includes(code));
   const others = allCodes.filter(code => !POPULAR_CURRENCIES.includes(code)).sort();
-  const orderedCodes = [...popular, ...others];
-  
+  return [...popular, ...others];
+}
+
+function normalizeCurrencyCode(value) {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(normalized) ? normalized : null;
+}
+
+function persistCurrencySelection(partial) {
+  const syncUpdates = {};
+  const localUpdates = {};
+
+  if (partial.targetCurrency) {
+    syncUpdates.targetCurrency = partial.targetCurrency;
+    localUpdates.targetCurrencyBackup = partial.targetCurrency;
+  }
+  if (partial.fromCurrency) {
+    syncUpdates.fromCurrency = partial.fromCurrency;
+    localUpdates.fromCurrencyBackup = partial.fromCurrency;
+  }
+
+  const writes = [];
+  if (Object.keys(syncUpdates).length > 0) {
+    writes.push(chrome.storage.sync.set(syncUpdates));
+  }
+  if (Object.keys(localUpdates).length > 0) {
+    writes.push(chrome.storage.local.set(localUpdates));
+  }
+
+  if (writes.length > 0) {
+    Promise.all(writes).catch(error => {
+      console.error('Failed to persist currency selection:', error);
+    });
+  }
+}
+
+function populateCurrencySelect(selectElement, currencies, selectedValue, isSmall = false) {
+  selectElement.innerHTML = '';
+  const orderedCodes = getOrderedFiatCodes(currencies);
+
   for (const code of orderedCodes) {
     const option = createOption(code, currencies[code], selectedValue, isSmall);
     selectElement.appendChild(option);
@@ -127,20 +221,37 @@ function createOption(code, name, selectedValue, isSmall) {
 let currentDecimalPlaces = 2;
 
 document.addEventListener('DOMContentLoaded', () => {
-   const enableToggle = document.getElementById('enableToggle');
-   const targetCurrency = document.getElementById('targetCurrency');
-   const fromAmount = document.getElementById('fromAmount');
-   const fromCurrency = document.getElementById('fromCurrency');
-   const convertResult = document.getElementById('convertResult');
-   const resultCurrency = document.getElementById('resultCurrency');
-   const statusDot = document.querySelector('.status-dot');
-   const statusText = document.querySelector('.status-text');
+  const enableToggle = document.getElementById('enableToggle');
+  const targetCurrency = document.getElementById('targetCurrency');
+  const fromAmount = document.getElementById('fromAmount');
+  const fromCurrency = document.getElementById('fromCurrency');
+  const convertResult = document.getElementById('convertResult');
+  const resultCurrency = document.getElementById('resultCurrency');
+  const statusDot = document.querySelector('.status-dot');
+  const statusText = document.querySelector('.status-text');
   const swapBtn = document.getElementById('swapBtn');
   const decimalPlacesSelect = document.getElementById('decimalPlaces');
   const tooltipPositionSelect = document.getElementById('tooltipPosition');
   const tooltipThemeSelect = document.getElementById('tooltipTheme');
   const resultGradientSelect = document.getElementById('resultGradient');
   
+
+  // Per-site toggle elements
+  const siteToggle = document.getElementById('siteToggle');
+  const siteToggleRow = document.getElementById('siteToggleRow');
+  const currentSiteDisplay = document.getElementById('currentSiteDisplay');
+
+  const MULTI_PART_TLDS = new Set([
+    'co.uk', 'org.uk', 'gov.uk', 'ac.uk',
+    'com.au', 'net.au', 'org.au',
+    'co.nz', 'co.jp', 'co.kr', 'co.in', 'co.id', 'co.za',
+    'com.br', 'com.mx', 'com.tr', 'com.sg', 'com.hk', 'com.cn', 'com.tw', 'com.ar', 'com.sa', 'com.eg', 'com.ng'
+  ]);
+
+  let currentRootDomain = null;
+  let currentSiteKeys = [];
+  let disabledSites = [];
+
   // Custom dropdown elements
   const fromCurrencyBtn = document.getElementById('fromCurrencyBtn');
   const fromCurrencyDisplay = document.getElementById('fromCurrencyDisplay');
@@ -155,21 +266,123 @@ document.addEventListener('DOMContentLoaded', () => {
   const targetCurrencyDropdown = document.getElementById('targetCurrencyDropdown');
   const targetCurrencyList = document.getElementById('targetCurrencyList');
   const targetCurrencyWrapper = document.querySelector('.custom-select-full');
-  const targetSection = targetCurrencyWrapper.closest('.section');
+  const targetSection = targetCurrencyWrapper ? targetCurrencyWrapper.closest('.section') : null;
 
-  // Fetch currencies and populate dropdowns
+  function normalizeHostname(hostname) {
+    return hostname.toLowerCase().replace(/\.$/, '');
+  }
+
+  function isIpAddress(hostname) {
+    return /^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname) || hostname.includes(':');
+  }
+
+  function getLegacyRootDomain(hostname) {
+    const normalized = normalizeHostname(hostname);
+    const parts = normalized.split('.');
+    if (parts.length <= 2) return normalized;
+    return parts.slice(-2).join('.');
+  }
+
+  function getRootDomain(hostname) {
+    const normalized = normalizeHostname(hostname);
+    if (!normalized || normalized === 'localhost' || isIpAddress(normalized)) {
+      return normalized;
+    }
+
+    const parts = normalized.split('.');
+    if (parts.length <= 2) {
+      return normalized;
+    }
+
+    const lastTwo = parts.slice(-2).join('.');
+    if (MULTI_PART_TLDS.has(lastTwo) && parts.length >= 3) {
+      return parts.slice(-3).join('.');
+    }
+
+    return lastTwo;
+  }
+
+  function getSiteKeys(hostname) {
+    const rootDomain = getRootDomain(hostname);
+    const legacyRootDomain = getLegacyRootDomain(hostname);
+    if (rootDomain === legacyRootDomain) {
+      return [rootDomain];
+    }
+    return [rootDomain, legacyRootDomain];
+  }
+
+  async function initSiteToggle() {
+    if (!siteToggle || !siteToggleRow || !currentSiteDisplay) return;
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tab && tab.url) {
+        const url = new URL(tab.url);
+        if (url.protocol === 'http:' || url.protocol === 'https:') {
+          currentRootDomain = getRootDomain(url.hostname);
+          currentSiteKeys = getSiteKeys(url.hostname);
+          currentSiteDisplay.textContent = currentRootDomain;
+          siteToggleRow.style.display = '';
+
+          const stored = await chrome.storage.sync.get({ disabledSites: [] });
+          disabledSites = stored.disabledSites;
+          siteToggle.checked = !disabledSites.some(site => currentSiteKeys.includes(site));
+        } else {
+          siteToggleRow.style.display = 'none';
+        }
+      } else {
+        siteToggleRow.style.display = 'none';
+      }
+    } catch (error) {
+      console.error('Failed to init site toggle:', error);
+      siteToggleRow.style.display = 'none';
+    }
+  }
+
   async function initCurrencies() {
     const currencies = await fetchCurrencies();
     if (currencies) {
       allCurrencies = currencies;
 
-      // Get saved values with defaults (Issue 3: Storage initialization)
-      const saved = await chrome.storage.sync.get({
-        targetCurrency: 'EUR',
-        fromCurrency: 'USD'
-      });
-      const savedTarget = saved.targetCurrency;
-      const savedFrom = saved.fromCurrency;
+      const [syncSaved, localSaved] = await Promise.all([
+        chrome.storage.sync.get({
+          targetCurrency: null,
+          fromCurrency: null
+        }),
+        chrome.storage.local.get({
+          targetCurrencyBackup: null,
+          fromCurrencyBackup: null
+        })
+      ]);
+
+      const syncTarget = normalizeCurrencyCode(syncSaved.targetCurrency);
+      const syncFrom = normalizeCurrencyCode(syncSaved.fromCurrency);
+      const localTarget = normalizeCurrencyCode(localSaved.targetCurrencyBackup);
+      const localFrom = normalizeCurrencyCode(localSaved.fromCurrencyBackup);
+
+      const resolvedTarget = syncTarget || localTarget || DEFAULT_TARGET_CURRENCY;
+      const resolvedFrom = syncFrom || localFrom || DEFAULT_FROM_CURRENCY;
+      const availableCodes = getOrderedFiatCodes(currencies).map(code => code.toUpperCase());
+      const availableSet = new Set(availableCodes);
+      const firstAvailableCode = availableCodes[0] || DEFAULT_TARGET_CURRENCY;
+
+      const savedTarget = availableSet.has(resolvedTarget)
+        ? resolvedTarget
+        : (availableSet.has(DEFAULT_TARGET_CURRENCY) ? DEFAULT_TARGET_CURRENCY : firstAvailableCode);
+      const savedFrom = availableSet.has(resolvedFrom)
+        ? resolvedFrom
+        : (availableSet.has(DEFAULT_FROM_CURRENCY) ? DEFAULT_FROM_CURRENCY : firstAvailableCode);
+
+      // Self-heal storage when sync keys are missing/invalid.
+      if (
+        !syncTarget || !syncFrom ||
+        localTarget !== savedTarget || localFrom !== savedFrom ||
+        resolvedTarget !== savedTarget || resolvedFrom !== savedFrom
+      ) {
+        persistCurrencySelection({
+          targetCurrency: savedTarget,
+          fromCurrency: savedFrom
+        });
+      }
       
       populateCurrencySelect(targetCurrency, currencies, savedTarget, false);
       populateCurrencySelect(fromCurrency, currencies, savedFrom, true);
@@ -179,30 +392,14 @@ document.addEventListener('DOMContentLoaded', () => {
       populateTargetCurrencyDropdown(currencies, savedTarget);
       
       resultCurrency.textContent = savedTarget;
-      
-      // Setup dropdown size handlers after populating
-      setupDropdownHandlers();
-      
       doQuickConvert();
     }
   }
   
   function populateFromCurrencyDropdown(currencies, selectedValue) {
     fromCurrencyList.innerHTML = '';
-    
-    // Get all valid fiat currency codes (exclude cryptocurrencies)
-    const allCodes = Object.keys(currencies).filter(code => {
-      const codeLower = code.toLowerCase();
-      return currencies[code] && 
-             typeof currencies[code] === 'string' &&
-             FIAT_CURRENCIES.has(codeLower) &&
-             !CRYPTO_CURRENCIES.has(codeLower);
-    });
-    
-    const popular = POPULAR_CURRENCIES.filter(code => allCodes.includes(code));
-    const others = allCodes.filter(code => !POPULAR_CURRENCIES.includes(code)).sort();
-    const orderedCodes = [...popular, ...others];
-    
+    const orderedCodes = getOrderedFiatCodes(currencies);
+
     for (const code of orderedCodes) {
       const item = document.createElement('div');
       item.className = 'dropdown-item';
@@ -225,20 +422,8 @@ document.addEventListener('DOMContentLoaded', () => {
   
   function populateTargetCurrencyDropdown(currencies, selectedValue) {
     targetCurrencyList.innerHTML = '';
-    
-    // Get all valid fiat currency codes (exclude cryptocurrencies)
-    const allCodes = Object.keys(currencies).filter(code => {
-      const codeLower = code.toLowerCase();
-      return currencies[code] && 
-             typeof currencies[code] === 'string' &&
-             FIAT_CURRENCIES.has(codeLower) &&
-             !CRYPTO_CURRENCIES.has(codeLower);
-    });
-    
-    const popular = POPULAR_CURRENCIES.filter(code => allCodes.includes(code));
-    const others = allCodes.filter(code => !POPULAR_CURRENCIES.includes(code)).sort();
-    const orderedCodes = [...popular, ...others];
-    
+    const orderedCodes = getOrderedFiatCodes(currencies);
+
     for (const code of orderedCodes) {
       const item = document.createElement('div');
       item.className = 'dropdown-item';
@@ -276,7 +461,7 @@ document.addEventListener('DOMContentLoaded', () => {
     closeFromDropdown();
     
     // Save and convert
-    chrome.storage.sync.set({ fromCurrency: value });
+    persistCurrencySelection({ fromCurrency: value });
     doQuickConvert();
   }
   
@@ -297,7 +482,7 @@ document.addEventListener('DOMContentLoaded', () => {
     closeTargetDropdown();
     
     // Save and convert
-    chrome.storage.sync.set({ targetCurrency: value });
+    persistCurrencySelection({ targetCurrency: value });
     doQuickConvert();
   }
   
@@ -374,12 +559,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
   
-  function setupDropdownHandlers() {
-    // No longer needed for native selects since we use custom dropdowns
-  }
-  
   initCurrencies();
 
+  initSiteToggle();
   // Load saved settings with defaults (Issue 3: Storage initialization)
   chrome.storage.sync.get({ enabled: true }, (result) => {
     enableToggle.checked = result.enabled;
@@ -437,18 +619,24 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.storage.sync.set({ enabled: enableToggle.checked });
   });
  
-  targetCurrency.addEventListener('change', () => {
-    chrome.storage.sync.set({ targetCurrency: targetCurrency.value });
-    resultCurrency.textContent = targetCurrency.value;
-    doQuickConvert();
-  });
+
+  if (siteToggle) {
+    siteToggle.addEventListener('change', async () => {
+      if (!currentRootDomain) return;
+      const stored = await chrome.storage.sync.get({ disabledSites: [] });
+      disabledSites = stored.disabledSites;
+      if (siteToggle.checked) {
+        disabledSites = disabledSites.filter(site => !currentSiteKeys.includes(site));
+      } else {
+        if (!disabledSites.includes(currentRootDomain)) {
+          disabledSites.push(currentRootDomain);
+        }
+      }
+      await chrome.storage.sync.set({ disabledSites });
+    });
+  }
  
   fromAmount.addEventListener('input', doQuickConvert);
-  
-  fromCurrency.addEventListener('change', () => {
-    chrome.storage.sync.set({ fromCurrency: fromCurrency.value });
-    doQuickConvert();
-  });
 
   // Preference event listeners
   decimalPlacesSelect.addEventListener('change', () => {
@@ -528,9 +716,9 @@ document.addEventListener('DOMContentLoaded', () => {
         item.classList.toggle('selected', item.dataset.value === currentFrom);
       });
       
-      chrome.storage.sync.set({ 
+      persistCurrencySelection({
         targetCurrency: currentFrom,
-        fromCurrency: currentTo 
+        fromCurrency: currentTo
       });
       doQuickConvert();
     }
