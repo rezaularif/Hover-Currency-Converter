@@ -22,7 +22,19 @@
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
         </button>
         <div id="targetCurrencyDropdown" class="custom-dropdown custom-dropdown-full hidden" role="listbox" aria-label="Target currency options">
+          <div class="dropdown-search-wrap">
+            <input
+              type="text"
+              id="targetCurrencySearch"
+              class="dropdown-search-input"
+              placeholder="Search code or name"
+              aria-label="Search target currency"
+              autocomplete="off"
+              spellcheck="false"
+            >
+          </div>
           <div class="dropdown-list" id="targetCurrencyList"></div>
+          <div id="targetCurrencyNoResults" class="dropdown-empty">No currencies found</div>
         </div>
         <select id="targetCurrency" style="display:none;">
           <option value="">Loading currencies...</option>
@@ -91,6 +103,10 @@
             <option value="sunset-gradient">Sunset</option>
             <option value="forest-gradient">Forest</option>
             <option value="golden-gradient">Golden</option>
+            <option value="aurora-gradient">Aurora</option>
+            <option value="ember-gradient">Ember</option>
+            <option value="midnight-gradient">Midnight</option>
+            <option value="berry-gradient">Berry</option>
           </optgroup>
           <optgroup label="Solid Colors">
             <option value="dark-gray">Dark Gray</option>
@@ -98,6 +114,10 @@
             <option value="deep-purple">Deep Purple</option>
             <option value="teal">Teal</option>
             <option value="slate">Slate</option>
+            <option value="charcoal">Charcoal</option>
+            <option value="cobalt">Cobalt</option>
+            <option value="burgundy">Burgundy</option>
+            <option value="emerald">Emerald</option>
           </optgroup>
         </select>
       </div>
@@ -114,6 +134,14 @@
           <option value="blue-cyan">Cyan</option>
           <option value="red-orange">Red</option>
           <option value="teal-green">Teal</option>
+          <option value="aurora">Aurora</option>
+          <option value="ember">Ember</option>
+          <option value="midnight">Midnight</option>
+          <option value="berry">Berry</option>
+          <option value="aqua-lime">Aqua Lime</option>
+          <option value="rose-gold">Rose Gold</option>
+          <option value="cobalt-cyan">Cobalt Cyan</option>
+          <option value="graphite">Graphite</option>
         </select>
       </div>
 

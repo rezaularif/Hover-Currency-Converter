@@ -74,6 +74,26 @@ const CURRENCIES_API_URL = 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-a
 const CURRENCIES_CACHE_DURATION = 24 * 60 * 60 * 1000;
 const DEFAULT_TARGET_CURRENCY = 'EUR';
 const DEFAULT_FROM_CURRENCY = 'USD';
+const DEFAULT_RESULT_GRADIENT = 'purple-orange';
+const VALID_RESULT_GRADIENTS = new Set([
+  'purple-orange',
+  'ocean-blue',
+  'sunset',
+  'forest',
+  'golden',
+  'purple-pink',
+  'blue-cyan',
+  'red-orange',
+  'teal-green',
+  'aurora',
+  'ember',
+  'midnight',
+  'berry',
+  'aqua-lime',
+  'rose-gold',
+  'cobalt-cyan',
+  'graphite'
+]);
 
 let allCurrencies = null;
 async function fetchCurrencies() {
@@ -251,6 +271,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentRootDomain = null;
   let currentSiteKeys = [];
   let disabledSites = [];
+  let currenciesLoadFailed = false;
 
   // Custom dropdown elements
   const fromCurrencyBtn = document.getElementById('fromCurrencyBtn');
@@ -265,8 +286,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const targetCurrencyDisplay = document.getElementById('targetCurrencyDisplay');
   const targetCurrencyDropdown = document.getElementById('targetCurrencyDropdown');
   const targetCurrencyList = document.getElementById('targetCurrencyList');
+  const targetCurrencySearch = document.getElementById('targetCurrencySearch');
+  const targetCurrencyNoResults = document.getElementById('targetCurrencyNoResults');
   const targetCurrencyWrapper = document.querySelector('.custom-select-full');
   const targetSection = targetCurrencyWrapper ? targetCurrencyWrapper.closest('.section') : null;
+  fromCurrencyBtn.setAttribute('aria-expanded', 'false');
+  targetCurrencyBtn.setAttribute('aria-expanded', 'false');
 
   function normalizeHostname(hostname) {
     return hostname.toLowerCase().replace(/\.$/, '');
@@ -340,60 +365,76 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function initCurrencies() {
     const currencies = await fetchCurrencies();
-    if (currencies) {
-      allCurrencies = currencies;
-
-      const [syncSaved, localSaved] = await Promise.all([
-        chrome.storage.sync.get({
-          targetCurrency: null,
-          fromCurrency: null
-        }),
-        chrome.storage.local.get({
-          targetCurrencyBackup: null,
-          fromCurrencyBackup: null
-        })
-      ]);
-
-      const syncTarget = normalizeCurrencyCode(syncSaved.targetCurrency);
-      const syncFrom = normalizeCurrencyCode(syncSaved.fromCurrency);
-      const localTarget = normalizeCurrencyCode(localSaved.targetCurrencyBackup);
-      const localFrom = normalizeCurrencyCode(localSaved.fromCurrencyBackup);
-
-      const resolvedTarget = syncTarget || localTarget || DEFAULT_TARGET_CURRENCY;
-      const resolvedFrom = syncFrom || localFrom || DEFAULT_FROM_CURRENCY;
-      const availableCodes = getOrderedFiatCodes(currencies).map(code => code.toUpperCase());
-      const availableSet = new Set(availableCodes);
-      const firstAvailableCode = availableCodes[0] || DEFAULT_TARGET_CURRENCY;
-
-      const savedTarget = availableSet.has(resolvedTarget)
-        ? resolvedTarget
-        : (availableSet.has(DEFAULT_TARGET_CURRENCY) ? DEFAULT_TARGET_CURRENCY : firstAvailableCode);
-      const savedFrom = availableSet.has(resolvedFrom)
-        ? resolvedFrom
-        : (availableSet.has(DEFAULT_FROM_CURRENCY) ? DEFAULT_FROM_CURRENCY : firstAvailableCode);
-
-      // Self-heal storage when sync keys are missing/invalid.
-      if (
-        !syncTarget || !syncFrom ||
-        localTarget !== savedTarget || localFrom !== savedFrom ||
-        resolvedTarget !== savedTarget || resolvedFrom !== savedFrom
-      ) {
-        persistCurrencySelection({
-          targetCurrency: savedTarget,
-          fromCurrency: savedFrom
-        });
-      }
-      
-      populateCurrencySelect(targetCurrency, currencies, savedTarget, false);
-      populateCurrencySelect(fromCurrency, currencies, savedFrom, true);
-      
-      // Populate custom dropdowns
-      populateFromCurrencyDropdown(currencies, savedFrom);
-      populateTargetCurrencyDropdown(currencies, savedTarget);
-      
-      resultCurrency.textContent = savedTarget;
-      doQuickConvert();
+    if (!currencies) {
+      currenciesLoadFailed = true;
+      targetCurrencyBtn.disabled = true;
+      fromCurrencyBtn.disabled = true;
+      swapBtn.disabled = true;
+      targetCurrencyBtn.setAttribute('aria-disabled', 'true');
+      fromCurrencyBtn.setAttribute('aria-disabled', 'true');
+      targetCurrencyDisplay.textContent = 'Unavailable';
+      fromCurrencyDisplay.textContent = 'Unavailable';
+      resultCurrency.textContent = '--';
+      convertResult.querySelector('.result-amount').textContent = 'Error';
+      statusDot.classList.remove('success');
+      statusDot.classList.add('error');
+      statusText.textContent = 'Failed to load currency list';
+      return;
     }
+
+    currenciesLoadFailed = false;
+    allCurrencies = currencies;
+
+    const [syncSaved, localSaved] = await Promise.all([
+      chrome.storage.sync.get({
+        targetCurrency: null,
+        fromCurrency: null
+      }),
+      chrome.storage.local.get({
+        targetCurrencyBackup: null,
+        fromCurrencyBackup: null
+      })
+    ]);
+
+    const syncTarget = normalizeCurrencyCode(syncSaved.targetCurrency);
+    const syncFrom = normalizeCurrencyCode(syncSaved.fromCurrency);
+    const localTarget = normalizeCurrencyCode(localSaved.targetCurrencyBackup);
+    const localFrom = normalizeCurrencyCode(localSaved.fromCurrencyBackup);
+
+    const resolvedTarget = syncTarget || localTarget || DEFAULT_TARGET_CURRENCY;
+    const resolvedFrom = syncFrom || localFrom || DEFAULT_FROM_CURRENCY;
+    const availableCodes = getOrderedFiatCodes(currencies).map(code => code.toUpperCase());
+    const availableSet = new Set(availableCodes);
+    const firstAvailableCode = availableCodes[0] || DEFAULT_TARGET_CURRENCY;
+
+    const savedTarget = availableSet.has(resolvedTarget)
+      ? resolvedTarget
+      : (availableSet.has(DEFAULT_TARGET_CURRENCY) ? DEFAULT_TARGET_CURRENCY : firstAvailableCode);
+    const savedFrom = availableSet.has(resolvedFrom)
+      ? resolvedFrom
+      : (availableSet.has(DEFAULT_FROM_CURRENCY) ? DEFAULT_FROM_CURRENCY : firstAvailableCode);
+
+    // Self-heal storage when sync keys are missing/invalid.
+    if (
+      !syncTarget || !syncFrom ||
+      localTarget !== savedTarget || localFrom !== savedFrom ||
+      resolvedTarget !== savedTarget || resolvedFrom !== savedFrom
+    ) {
+      persistCurrencySelection({
+        targetCurrency: savedTarget,
+        fromCurrency: savedFrom
+      });
+    }
+    
+    populateCurrencySelect(targetCurrency, currencies, savedTarget, false);
+    populateCurrencySelect(fromCurrency, currencies, savedFrom, true);
+    
+    // Populate custom dropdowns
+    populateFromCurrencyDropdown(currencies, savedFrom);
+    populateTargetCurrencyDropdown(currencies, savedTarget);
+    
+    resultCurrency.textContent = savedTarget;
+    doQuickConvert();
   }
   
   function populateFromCurrencyDropdown(currencies, selectedValue) {
@@ -430,6 +471,7 @@ document.addEventListener('DOMContentLoaded', () => {
       item.dataset.value = code.toUpperCase();
       const flag = getFlag(code);
       const name = currencies[code] || code.toUpperCase();
+      item.dataset.search = `${code.toUpperCase()} ${name}`.toLowerCase();
       item.textContent = `${flag} ${code.toUpperCase()} - ${name}`;
       
       if (code.toUpperCase() === selectedValue) {
@@ -443,6 +485,35 @@ document.addEventListener('DOMContentLoaded', () => {
       
       targetCurrencyList.appendChild(item);
     }
+
+    filterTargetCurrencyDropdown(targetCurrencySearch?.value || '');
+  }
+
+  function filterTargetCurrencyDropdown(query) {
+    const normalizedQuery = (query || '').trim().toLowerCase();
+    let visibleCount = 0;
+    const totalItems = targetCurrencyList.querySelectorAll('.dropdown-item').length;
+
+    targetCurrencyList.querySelectorAll('.dropdown-item').forEach(item => {
+      const matches = !normalizedQuery || item.dataset.search.includes(normalizedQuery);
+      item.style.display = matches ? '' : 'none';
+      if (matches) visibleCount++;
+    });
+
+    if (targetCurrencyNoResults) {
+      targetCurrencyNoResults.classList.toggle('visible', totalItems > 0 && visibleCount === 0);
+    }
+  }
+
+  function getFirstVisibleTargetCurrencyItem() {
+    return Array.from(targetCurrencyList.querySelectorAll('.dropdown-item')).find(item => item.style.display !== 'none') || null;
+  }
+
+  function resetTargetCurrencySearch() {
+    if (targetCurrencySearch) {
+      targetCurrencySearch.value = '';
+    }
+    filterTargetCurrencyDropdown('');
   }
   
   function selectFromCurrency(value, display) {
@@ -505,9 +576,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   
   function openFromDropdown() {
+    if (fromCurrencyBtn.disabled) return;
     closeTargetDropdown();
     fromCurrencyDropdown.classList.remove('hidden');
     fromCurrencyWrapper.classList.add('open');
+    fromCurrencyBtn.setAttribute('aria-expanded', 'true');
     if (converterSection) {
       converterSection.classList.add('dropdown-open');
     }
@@ -516,26 +589,35 @@ document.addEventListener('DOMContentLoaded', () => {
   function closeFromDropdown() {
     fromCurrencyDropdown.classList.add('hidden');
     fromCurrencyWrapper.classList.remove('open');
+    fromCurrencyBtn.setAttribute('aria-expanded', 'false');
     if (converterSection) {
       converterSection.classList.remove('dropdown-open');
     }
   }
   
   function openTargetDropdown() {
+    if (targetCurrencyBtn.disabled) return;
     closeFromDropdown();
     targetCurrencyDropdown.classList.remove('hidden');
     targetCurrencyWrapper.classList.add('open');
+    targetCurrencyBtn.setAttribute('aria-expanded', 'true');
     if (targetSection) {
       targetSection.classList.add('dropdown-open');
+    }
+    resetTargetCurrencySearch();
+    if (targetCurrencySearch) {
+      targetCurrencySearch.focus();
     }
   }
   
   function closeTargetDropdown() {
     targetCurrencyDropdown.classList.add('hidden');
     targetCurrencyWrapper.classList.remove('open');
+    targetCurrencyBtn.setAttribute('aria-expanded', 'false');
     if (targetSection) {
       targetSection.classList.remove('dropdown-open');
     }
+    resetTargetCurrencySearch();
   }
   
   // Custom dropdown event listeners
@@ -548,6 +630,33 @@ document.addEventListener('DOMContentLoaded', () => {
     e.stopPropagation();
     toggleTargetDropdown();
   });
+
+  if (targetCurrencySearch) {
+    targetCurrencySearch.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+
+    targetCurrencySearch.addEventListener('input', () => {
+      filterTargetCurrencyDropdown(targetCurrencySearch.value);
+    });
+
+    targetCurrencySearch.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeTargetDropdown();
+        targetCurrencyBtn.focus();
+        return;
+      }
+
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const firstVisibleItem = getFirstVisibleTargetCurrencyItem();
+        if (firstVisibleItem) {
+          firstVisibleItem.click();
+        }
+      }
+    });
+  }
   
   // Close when clicking outside
   document.addEventListener('click', (e) => {
@@ -572,7 +681,7 @@ document.addEventListener('DOMContentLoaded', () => {
     decimalPlaces: 2,
     tooltipPosition: 'below',
     tooltipTheme: 'purple-gradient',
-    resultGradient: 'purple-orange',
+    resultGradient: DEFAULT_RESULT_GRADIENT,
     lastFetch: null
   }, (result) => {
     // User preferences
@@ -582,9 +691,21 @@ document.addEventListener('DOMContentLoaded', () => {
     tooltipThemeSelect.value = result.tooltipTheme;
 
     // Apply result gradient
-    const savedGradient = result.resultGradient;
+    const savedGradient = VALID_RESULT_GRADIENTS.has(result.resultGradient)
+      ? result.resultGradient
+      : DEFAULT_RESULT_GRADIENT;
     resultGradientSelect.value = savedGradient;
     applyResultGradient(savedGradient);
+    if (savedGradient !== result.resultGradient) {
+      chrome.storage.local.set({ resultGradient: savedGradient });
+    }
+
+    if (currenciesLoadFailed) {
+      statusDot.classList.remove('success');
+      statusDot.classList.add('error');
+      statusText.textContent = 'Failed to load currency list';
+      return;
+    }
 
     // Rates status
     if (result.lastFetch) {
@@ -654,12 +775,18 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   resultGradientSelect.addEventListener('change', () => {
-    const gradient = resultGradientSelect.value;
+    const gradient = VALID_RESULT_GRADIENTS.has(resultGradientSelect.value)
+      ? resultGradientSelect.value
+      : DEFAULT_RESULT_GRADIENT;
+    resultGradientSelect.value = gradient;
     chrome.storage.local.set({ resultGradient: gradient });
     applyResultGradient(gradient);
   });
 
   function applyResultGradient(gradient) {
+    const normalizedGradient = VALID_RESULT_GRADIENTS.has(gradient)
+      ? gradient
+      : DEFAULT_RESULT_GRADIENT;
     // Remove all gradient classes from result box
     convertResult.classList.remove(
       'result-gradient-purple-orange',
@@ -670,10 +797,18 @@ document.addEventListener('DOMContentLoaded', () => {
       'result-gradient-purple-pink',
       'result-gradient-blue-cyan',
       'result-gradient-red-orange',
-      'result-gradient-teal-green'
+      'result-gradient-teal-green',
+      'result-gradient-aurora',
+      'result-gradient-ember',
+      'result-gradient-midnight',
+      'result-gradient-berry',
+      'result-gradient-aqua-lime',
+      'result-gradient-rose-gold',
+      'result-gradient-cobalt-cyan',
+      'result-gradient-graphite'
     );
     // Add the selected gradient class to result box
-    convertResult.classList.add(`result-gradient-${gradient}`);
+    convertResult.classList.add(`result-gradient-${normalizedGradient}`);
     
     // Remove all border gradient classes from converter section
     converterSection.classList.remove(
@@ -685,10 +820,18 @@ document.addEventListener('DOMContentLoaded', () => {
       'border-gradient-purple-pink',
       'border-gradient-blue-cyan',
       'border-gradient-red-orange',
-      'border-gradient-teal-green'
+      'border-gradient-teal-green',
+      'border-gradient-aurora',
+      'border-gradient-ember',
+      'border-gradient-midnight',
+      'border-gradient-berry',
+      'border-gradient-aqua-lime',
+      'border-gradient-rose-gold',
+      'border-gradient-cobalt-cyan',
+      'border-gradient-graphite'
     );
     // Add the matching border gradient class to converter section
-    converterSection.classList.add(`border-gradient-${gradient}`);
+    converterSection.classList.add(`border-gradient-${normalizedGradient}`);
   }
 
   // Swap button functionality

@@ -38,26 +38,61 @@
   };
 
   const SYMBOL_TO_CURRENCY = {
+    'US$': 'USD', 'C$': 'CAD', 'CA$': 'CAD', 'A$': 'AUD', 'AU$': 'AUD',
+    'NZ$': 'NZD', 'HK$': 'HKD', 'S$': 'SGD', 'SG$': 'SGD', 'MX$': 'MXN',
+    'AR$': 'ARS', 'CLP$': 'CLP', 'COL$': 'COP', 'RD$': 'DOP', 'TT$': 'TTD',
+    'J$': 'JMD', 'B$': 'BND', 'EC$': 'XCD', 'NT$': 'TWD', 'R$': 'BRL',
     '$': 'USD', '€': 'EUR', '£': 'GBP', '¥': 'JPY', '₹': 'INR',
     '₩': 'KRW', '₺': 'TRY', '฿': 'THB', '₱': 'PHP', '₪': 'ILS',
-    '৳': 'BDT', '₨': 'PKR', '₽': 'RUB', '₸': 'KZT', '₮': 'MNT',
-    '₭': 'LAK', '₾': 'GEL', '₦': 'NGN', '₲': 'PYG', '₴': 'UAH',
-    '₫': 'VND', '₡': 'CRC', '₵': 'GHS', '﷼': 'SAR', 'R$': 'BRL',
+    '৳': 'BDT', '₨': 'PKR', '₽': 'RUB', '₸': 'KZT', '₮': 'MNT', '₭': 'LAK',
+    '₾': 'GEL', '₦': 'NGN', '₲': 'PYG', '₴': 'UAH', '₫': 'VND', '₡': 'CRC',
+    '₵': 'GHS', '﷼': 'SAR',
     'zł': 'PLN', 'Kč': 'CZK', 'kr': 'SEK', 'CHF': 'CHF'
   };
 
   const VALID_CURRENCY_CODES = new Set(Object.keys(CURRENCY_SYMBOLS));
 
-  const REGEX_SYMBOL_BEFORE = /([$€£¥₹₩₺฿₱₪৳₨₽₸₮₭₾₦₲₴₫₡₵﷼])\s*([\d,]+(?:\.\d{1,2})?)/;
-  const REGEX_SYMBOL_AFTER = /([\d,]+(?:\.\d{1,2})?)\s*([$€£¥₹₩₺฿₱₪৳₨₽₸₮₭₾₦₲₴₫₡₵﷼])/;
+  function escapeRegExp(value) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  const SYMBOL_PATTERN = Object.keys(SYMBOL_TO_CURRENCY)
+    .sort((a, b) => b.length - a.length)
+    .map(escapeRegExp)
+    .join('|');
+
+  const REGEX_SYMBOL_BEFORE = new RegExp(`(${SYMBOL_PATTERN})\\s*([\\d,]+(?:\\.\\d{1,2})?)`);
+  const REGEX_SYMBOL_AFTER = new RegExp(`([\\d,]+(?:\\.\\d{1,2})?)\\s*(${SYMBOL_PATTERN})`);
   const REGEX_CODE_AFTER = /([\d,]+(?:\.\d{1,2})?)\s*([A-Z]{3})\b/;
   const REGEX_CODE_BEFORE = /\b([A-Z]{3})\s*([\d,]+(?:\.\d{1,2})?)/;
 
-  const REGEX_SYMBOL_BEFORE_EU = /([$€£¥₹₩₺฿₱₪৳₨₽₸₮₭₾₦₲₴₫₡₵﷼])\s*([\d.]+(?:,\d{1,2})?)/;
-  const REGEX_SYMBOL_AFTER_EU = /([\d.]+(?:,\d{1,2})?)\s*([$€£¥₹₩₺฿₱₪৳₨₽₸₮₭₾₦₲₴₫₡₵﷼])/;
+  const REGEX_SYMBOL_BEFORE_EU = new RegExp(`(${SYMBOL_PATTERN})\\s*([\\d.]+(?:,\\d{1,2})?)`);
+  const REGEX_SYMBOL_AFTER_EU = new RegExp(`([\\d.]+(?:,\\d{1,2})?)\\s*(${SYMBOL_PATTERN})`);
   const REGEX_CODE_AFTER_EU = /([\d.]+(?:,\d{1,2})?)\s*([A-Z]{3})\b/;
   const REGEX_CODE_BEFORE_EU = /\b([A-Z]{3})\s*([\d.]+(?:,\d{1,2})?)/;
   const DEFAULT_TARGET_CURRENCY = 'EUR';
+  const DEFAULT_DECIMAL_PLACES = 2;
+  const VALID_TOOLTIP_POSITIONS = new Set(['above', 'below', 'left', 'right']);
+  const VALID_TOOLTIP_THEMES = new Set([
+    'purple-gradient',
+    'ocean-gradient',
+    'sunset-gradient',
+    'forest-gradient',
+    'golden-gradient',
+    'aurora-gradient',
+    'ember-gradient',
+    'midnight-gradient',
+    'berry-gradient',
+    'dark-gray',
+    'navy-blue',
+    'deep-purple',
+    'teal',
+    'slate',
+    'charcoal',
+    'cobalt',
+    'burgundy',
+    'emerald'
+  ]);
   const MULTI_PART_TLDS = new Set([
     'co.uk', 'org.uk', 'gov.uk', 'ac.uk',
     'com.au', 'net.au', 'org.au',
@@ -74,12 +109,34 @@
   let disabledSites = [];
   let currentElement = null;
   let pendingRequest = null;
-  let decimalPlaces = 2;
+  let decimalPlaces = DEFAULT_DECIMAL_PLACES;
   let tooltipPosition = 'below';
   let tooltipTheme = 'purple-gradient';
   let lastMoveTime = 0;
   let listenersAttached = false;
   let hideTimeout = null;
+
+  function normalizeDecimalPlaces(value) {
+    const numeric = Number(value);
+    if (Number.isInteger(numeric) && numeric >= 0 && numeric <= 4) {
+      return numeric;
+    }
+    return DEFAULT_DECIMAL_PLACES;
+  }
+
+  function normalizeTooltipPosition(value) {
+    if (typeof value === 'string' && VALID_TOOLTIP_POSITIONS.has(value)) {
+      return value;
+    }
+    return 'below';
+  }
+
+  function normalizeTooltipTheme(value) {
+    if (typeof value === 'string' && VALID_TOOLTIP_THEMES.has(value)) {
+      return value;
+    }
+    return 'purple-gradient';
+  }
 
   function throttle(fn, delay) {
     let lastCall = 0;
@@ -109,11 +166,11 @@
     document.body.appendChild(tooltip);
   }
 
-  function showTooltip(x, y, original, converted, fromCode, toCode, serverDecimals) {
+  function showTooltip(x, y, original, converted, fromCode, toCode) {
     if (!tooltip) createTooltip();
     const fromSymbol = CURRENCY_SYMBOLS[fromCode] || fromCode;
     const toSymbol = CURRENCY_SYMBOLS[toCode] || toCode;
-    const displayDecimals = serverDecimals !== undefined ? serverDecimals : decimalPlaces;
+    const displayDecimals = decimalPlaces;
     tooltip.textContent = '';
     const originalSpan = document.createElement('span');
     originalSpan.className = 'hcc-original';
@@ -290,7 +347,7 @@
         toCurrency: targetCurrency
       }, response => {
         if (response?.success && pendingRequest === target && currentElement === target) {
-          showTooltip(e.clientX, e.clientY, parsed.amount, response.converted, parsed.currency, targetCurrency, response.decimals);
+          showTooltip(e.clientX, e.clientY, parsed.amount, response.converted, parsed.currency, targetCurrency);
         }
       });
     } else {
@@ -351,7 +408,7 @@
           const rect = target.getBoundingClientRect();
           const x = rect.left + rect.width / 2;
           const y = rect.bottom;
-          showTooltip(x, y, parsed.amount, response.converted, parsed.currency, targetCurrency, response.decimals);
+          showTooltip(x, y, parsed.amount, response.converted, parsed.currency, targetCurrency);
         }
       });
     }
@@ -510,9 +567,9 @@
       checkSiteEnabled();
       updateListenerState();
 
-      decimalPlaces = localResult.decimalPlaces;
-      tooltipPosition = localResult.tooltipPosition;
-      tooltipTheme = localResult.tooltipTheme;
+      decimalPlaces = normalizeDecimalPlaces(localResult.decimalPlaces);
+      tooltipPosition = normalizeTooltipPosition(localResult.tooltipPosition);
+      tooltipTheme = normalizeTooltipTheme(localResult.tooltipTheme);
     } catch (error) {
       console.error('Failed to initialize content settings:', error);
       checkSiteEnabled();
@@ -541,13 +598,13 @@
           }
         }
         if (changes.decimalPlaces) {
-          decimalPlaces = changes.decimalPlaces.newValue;
+          decimalPlaces = normalizeDecimalPlaces(changes.decimalPlaces.newValue);
         }
         if (changes.tooltipPosition) {
-          tooltipPosition = changes.tooltipPosition.newValue;
+          tooltipPosition = normalizeTooltipPosition(changes.tooltipPosition.newValue);
         }
         if (changes.tooltipTheme) {
-          tooltipTheme = changes.tooltipTheme.newValue;
+          tooltipTheme = normalizeTooltipTheme(changes.tooltipTheme.newValue);
         }
       }
     });

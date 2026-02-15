@@ -1,4 +1,5 @@
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
+const API_TIMEOUT_MS = 10000;
 const API_BASE = 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1';
 const API_FALLBACK = 'https://latest.currency-api.pages.dev/v1';
 
@@ -21,7 +22,11 @@ async function fetchWithRetry(url, maxAttempts = 3) {
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
-      const response = await fetch(url);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+      const response = await fetch(url, { signal: controller.signal }).finally(() => {
+        clearTimeout(timeoutId);
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);

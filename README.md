@@ -5,7 +5,7 @@
 </div>
 
 [![Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-Available-brightgreen)](https://chromewebstore.google.com/detail/hover-currency-converter/plbdgcecigogedfihfmabohdbbbokfka)
-[![Version](https://img.shields.io/badge/version-1.0.5-blue)](https://chromewebstore.google.com/detail/hover-currency-converter/plbdgcecigogedfihfmabohdbbbokfka)
+[![Version](https://img.shields.io/badge/version-1.0.6-blue)](https://chromewebstore.google.com/detail/hover-currency-converter/plbdgcecigogedfihfmabohdbbbokfka)
 
 <div align="center">
   <img src="screenshots/banner.png" alt="Hover Currency Converter Banner" width="100%">
@@ -15,9 +15,10 @@ Convert currency prices on hover - see converted values instantly when hovering 
 
 ## 🌟 Features
 
-- **Instant Hover-to-Convert Tooltip** - Hover over prices like `$19.99`, `€49`, or `19.99 USD` to see instant conversions
+- **Instant Hover-to-Convert Tooltip** - Hover over prices like `$19.99`, `R$ 19,99`, `€49`, or `19.99 USD` to see instant conversions
 - **Works on Any Website** - Automatically detects prices in various formats across all websites
 - **Customizable Target Currency** - Choose your preferred currency in the side panel
+- **Type-to-Search Currency Picker** - Quickly find and select your target currency without long scrolling
 - **Quick Converter** - Use the side panel for manual currency conversions
 - **Smart Caching** - Exchange rates are cached to minimize network usage
 - **Easy Toggle** - Enable or disable the extension with one click
@@ -41,6 +42,7 @@ Install from the Chrome Web Store:
 ### Example Usage
 
 - Hover over `$19.99` → See conversion to your selected currency (e.g., `€18.50`)
+- Hover over `R$ 19,99` → See conversion using local symbol-aware detection
 - Hover over `€49` → See conversion to your selected currency (e.g., `$53.20`)
 - Hover over `19.99 USD` → See conversion to your selected currency
 
