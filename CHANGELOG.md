@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.0.7] - 2026-03-06
+
+### Fixed
+- Repaired invalid stored settings during extension updates instead of only filling missing values.
+- Hardened side-panel preference loading so invalid decimal places, tooltip positions, themes, and gradients fall back to safe defaults.
+- Sanitized malformed `disabledSites` data before site-toggle reads and writes to prevent panel breakage from corrupted sync storage.
+
+### Improved
+- Centralized settings normalization and repair rules into a shared module used by both the background worker and side panel.
+- Added regression tests covering storage repair for currencies, display preferences, and disabled-site lists.
+
 ## [1.0.6] - 2026-02-15
 
 ### Fixed

@@ -1,3 +1,10 @@
+import {
+  DEFAULT_LOCAL_SETTINGS,
+  DEFAULT_SYNC_SETTINGS,
+  resolveLocalSettings,
+  resolveSyncSettings
+} from '../lib/settings.js';
+
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
 const API_TIMEOUT_MS = 10000;
 const API_BASE = 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1';
@@ -160,26 +167,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-const DEFAULT_SYNC_SETTINGS = {
-  targetCurrency: 'EUR',
-  fromCurrency: 'USD',
-  enabled: true,
-  disabledSites: []
-};
+function collectChangedSettings(currentValues, normalizedValues) {
+  const updates = {};
 
-const DEFAULT_LOCAL_SETTINGS = {
-  decimalPlaces: 2,
-  tooltipPosition: 'below',
-  tooltipTheme: 'purple-gradient',
-  resultGradient: 'purple-orange',
-  targetCurrencyBackup: 'EUR',
-  fromCurrencyBackup: 'USD'
-};
+  for (const [key, normalizedValue] of Object.entries(normalizedValues)) {
+    const currentValue = currentValues[key];
+    const hasChanged = Array.isArray(normalizedValue)
+      ? JSON.stringify(currentValue) !== JSON.stringify(normalizedValue)
+      : currentValue !== normalizedValue;
 
-function normalizeCurrencyCode(value) {
-  if (typeof value !== 'string') return null;
-  const normalized = value.trim().toUpperCase();
-  return /^[A-Z]{3}$/.test(normalized) ? normalized : null;
+    if (hasChanged) {
+      updates[key] = normalizedValue;
+    }
+  }
+
+  return updates;
 }
 
 // Inject content script if needed and open side panel when extension icon is clicked
@@ -242,30 +244,15 @@ chrome.runtime.onInstalled.addListener(async (details) => {
         })
       ]);
 
-      const syncTarget = normalizeCurrencyCode(syncValues.targetCurrency);
-      const syncFrom = normalizeCurrencyCode(syncValues.fromCurrency);
-      const localTarget = normalizeCurrencyCode(localValues.targetCurrencyBackup);
-      const localFrom = normalizeCurrencyCode(localValues.fromCurrencyBackup);
+      const normalizedSyncSettings = resolveSyncSettings(syncValues, localValues);
+      const normalizedLocalSettings = resolveLocalSettings(localValues, normalizedSyncSettings);
 
-      const syncUpdates = {};
-      if (!syncTarget) syncUpdates.targetCurrency = localTarget || DEFAULT_SYNC_SETTINGS.targetCurrency;
-      if (!syncFrom) syncUpdates.fromCurrency = localFrom || DEFAULT_SYNC_SETTINGS.fromCurrency;
-      if (typeof syncValues.enabled !== 'boolean') syncUpdates.enabled = DEFAULT_SYNC_SETTINGS.enabled;
-      if (!Array.isArray(syncValues.disabledSites)) syncUpdates.disabledSites = DEFAULT_SYNC_SETTINGS.disabledSites;
+      const syncUpdates = collectChangedSettings(syncValues, normalizedSyncSettings);
       if (Object.keys(syncUpdates).length > 0) {
         await chrome.storage.sync.set(syncUpdates);
       }
 
-      const effectiveTarget = syncTarget || syncUpdates.targetCurrency || DEFAULT_SYNC_SETTINGS.targetCurrency;
-      const effectiveFrom = syncFrom || syncUpdates.fromCurrency || DEFAULT_SYNC_SETTINGS.fromCurrency;
-
-      const localUpdates = {};
-      if (localValues.decimalPlaces === null) localUpdates.decimalPlaces = DEFAULT_LOCAL_SETTINGS.decimalPlaces;
-      if (localValues.tooltipPosition === null) localUpdates.tooltipPosition = DEFAULT_LOCAL_SETTINGS.tooltipPosition;
-      if (localValues.tooltipTheme === null) localUpdates.tooltipTheme = DEFAULT_LOCAL_SETTINGS.tooltipTheme;
-      if (localValues.resultGradient === null) localUpdates.resultGradient = DEFAULT_LOCAL_SETTINGS.resultGradient;
-      if (!localTarget) localUpdates.targetCurrencyBackup = effectiveTarget;
-      if (!localFrom) localUpdates.fromCurrencyBackup = effectiveFrom;
+      const localUpdates = collectChangedSettings(localValues, normalizedLocalSettings);
       if (Object.keys(localUpdates).length > 0) {
         await chrome.storage.local.set(localUpdates);
       }

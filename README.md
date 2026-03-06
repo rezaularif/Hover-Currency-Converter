@@ -5,7 +5,7 @@
 </div>
 
 [![Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-Available-brightgreen)](https://chromewebstore.google.com/detail/hover-currency-converter/plbdgcecigogedfihfmabohdbbbokfka)
-[![Version](https://img.shields.io/badge/version-1.0.6-blue)](https://chromewebstore.google.com/detail/hover-currency-converter/plbdgcecigogedfihfmabohdbbbokfka)
+[![Version](https://img.shields.io/badge/version-1.0.7-blue)](https://chromewebstore.google.com/detail/hover-currency-converter/plbdgcecigogedfihfmabohdbbbokfka)
 
 <div align="center">
   <img src="screenshots/banner.png" alt="Hover Currency Converter Banner" width="100%">

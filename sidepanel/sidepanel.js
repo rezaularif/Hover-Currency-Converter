@@ -1,3 +1,13 @@
+import {
+  DEFAULT_LOCAL_SETTINGS,
+  DEFAULT_SYNC_SETTINGS,
+  VALID_RESULT_GRADIENTS,
+  normalizeDisabledSites,
+  resolveDisplaySettings,
+  resolveLocalSettings,
+  resolveSyncSettings
+} from '../lib/settings.js';
+
 const CURRENCY_SYMBOLS = {
   AED: '🇦🇪', AFN: '🇦🇫', ALL: '🇦🇱', AMD: '🇦🇲', ANG: '🇦🇼',
   AOA: '🇦🇴', ARS: '🇦🇷', AUD: '🇦🇺', AWG: '🇦🇼', AZN: '🇦🇿',
@@ -72,28 +82,9 @@ const NON_FIAT_NAME_PATTERNS = [
 
 const CURRENCIES_API_URL = 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies.json';
 const CURRENCIES_CACHE_DURATION = 24 * 60 * 60 * 1000;
-const DEFAULT_TARGET_CURRENCY = 'EUR';
-const DEFAULT_FROM_CURRENCY = 'USD';
-const DEFAULT_RESULT_GRADIENT = 'purple-orange';
-const VALID_RESULT_GRADIENTS = new Set([
-  'purple-orange',
-  'ocean-blue',
-  'sunset',
-  'forest',
-  'golden',
-  'purple-pink',
-  'blue-cyan',
-  'red-orange',
-  'teal-green',
-  'aurora',
-  'ember',
-  'midnight',
-  'berry',
-  'aqua-lime',
-  'rose-gold',
-  'cobalt-cyan',
-  'graphite'
-]);
+const DEFAULT_TARGET_CURRENCY = DEFAULT_SYNC_SETTINGS.targetCurrency;
+const DEFAULT_FROM_CURRENCY = DEFAULT_SYNC_SETTINGS.fromCurrency;
+const DEFAULT_RESULT_GRADIENT = DEFAULT_LOCAL_SETTINGS.resultGradient;
 
 let allCurrencies = null;
 async function fetchCurrencies() {
@@ -179,10 +170,21 @@ function getOrderedFiatCodes(currencies) {
   return [...popular, ...others];
 }
 
-function normalizeCurrencyCode(value) {
-  if (typeof value !== 'string') return null;
-  const normalized = value.trim().toUpperCase();
-  return /^[A-Z]{3}$/.test(normalized) ? normalized : null;
+function collectChangedSettings(currentValues, normalizedValues) {
+  const updates = {};
+
+  for (const [key, normalizedValue] of Object.entries(normalizedValues)) {
+    const currentValue = currentValues[key];
+    const hasChanged = Array.isArray(normalizedValue)
+      ? JSON.stringify(currentValue) !== JSON.stringify(normalizedValue)
+      : currentValue !== normalizedValue;
+
+    if (hasChanged) {
+      updates[key] = normalizedValue;
+    }
+  }
+
+  return updates;
 }
 
 function persistCurrencySelection(partial) {
@@ -349,7 +351,7 @@ document.addEventListener('DOMContentLoaded', () => {
           siteToggleRow.style.display = '';
 
           const stored = await chrome.storage.sync.get({ disabledSites: [] });
-          disabledSites = stored.disabledSites;
+          disabledSites = normalizeDisabledSites(stored.disabledSites);
           siteToggle.checked = !disabledSites.some(site => currentSiteKeys.includes(site));
         } else {
           siteToggleRow.style.display = 'none';
@@ -396,13 +398,10 @@ document.addEventListener('DOMContentLoaded', () => {
       })
     ]);
 
-    const syncTarget = normalizeCurrencyCode(syncSaved.targetCurrency);
-    const syncFrom = normalizeCurrencyCode(syncSaved.fromCurrency);
-    const localTarget = normalizeCurrencyCode(localSaved.targetCurrencyBackup);
-    const localFrom = normalizeCurrencyCode(localSaved.fromCurrencyBackup);
-
-    const resolvedTarget = syncTarget || localTarget || DEFAULT_TARGET_CURRENCY;
-    const resolvedFrom = syncFrom || localFrom || DEFAULT_FROM_CURRENCY;
+    const normalizedSyncSettings = resolveSyncSettings(syncSaved, localSaved);
+    const normalizedLocalSettings = resolveLocalSettings(localSaved, normalizedSyncSettings);
+    const resolvedTarget = normalizedSyncSettings.targetCurrency;
+    const resolvedFrom = normalizedSyncSettings.fromCurrency;
     const availableCodes = getOrderedFiatCodes(currencies).map(code => code.toUpperCase());
     const availableSet = new Set(availableCodes);
     const firstAvailableCode = availableCodes[0] || DEFAULT_TARGET_CURRENCY;
@@ -416,8 +415,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Self-heal storage when sync keys are missing/invalid.
     if (
-      !syncTarget || !syncFrom ||
-      localTarget !== savedTarget || localFrom !== savedFrom ||
+      normalizedSyncSettings.targetCurrency !== savedTarget ||
+      normalizedSyncSettings.fromCurrency !== savedFrom ||
+      normalizedLocalSettings.targetCurrencyBackup !== savedTarget ||
+      normalizedLocalSettings.fromCurrencyBackup !== savedFrom ||
       resolvedTarget !== savedTarget || resolvedFrom !== savedFrom
     ) {
       persistCurrencySelection({
@@ -684,20 +685,22 @@ document.addEventListener('DOMContentLoaded', () => {
     resultGradient: DEFAULT_RESULT_GRADIENT,
     lastFetch: null
   }, (result) => {
+    const normalizedDisplaySettings = resolveDisplaySettings(result);
+
     // User preferences
-    currentDecimalPlaces = result.decimalPlaces;
+    currentDecimalPlaces = normalizedDisplaySettings.decimalPlaces;
     decimalPlacesSelect.value = currentDecimalPlaces;
-    tooltipPositionSelect.value = result.tooltipPosition;
-    tooltipThemeSelect.value = result.tooltipTheme;
+    tooltipPositionSelect.value = normalizedDisplaySettings.tooltipPosition;
+    tooltipThemeSelect.value = normalizedDisplaySettings.tooltipTheme;
 
     // Apply result gradient
-    const savedGradient = VALID_RESULT_GRADIENTS.has(result.resultGradient)
-      ? result.resultGradient
-      : DEFAULT_RESULT_GRADIENT;
+    const savedGradient = normalizedDisplaySettings.resultGradient;
     resultGradientSelect.value = savedGradient;
     applyResultGradient(savedGradient);
-    if (savedGradient !== result.resultGradient) {
-      chrome.storage.local.set({ resultGradient: savedGradient });
+
+    const localUpdates = collectChangedSettings(result, normalizedDisplaySettings);
+    if (Object.keys(localUpdates).length > 0) {
+      chrome.storage.local.set(localUpdates);
     }
 
     if (currenciesLoadFailed) {
@@ -745,7 +748,7 @@ document.addEventListener('DOMContentLoaded', () => {
     siteToggle.addEventListener('change', async () => {
       if (!currentRootDomain) return;
       const stored = await chrome.storage.sync.get({ disabledSites: [] });
-      disabledSites = stored.disabledSites;
+      disabledSites = normalizeDisabledSites(stored.disabledSites);
       if (siteToggle.checked) {
         disabledSites = disabledSites.filter(site => !currentSiteKeys.includes(site));
       } else {
