@@ -1,6 +1,12 @@
 (function() {
   if (window.__hccInitialized) return;
+  if (!globalThis.HCCSettingsCore || !globalThis.HCCCurrencyParser) {
+    console.error('Hover Currency Converter dependencies are unavailable');
+    return;
+  }
   window.__hccInitialized = true;
+
+  const { normalizeDisabledSites } = globalThis.HCCSettingsCore;
 
   const CURRENCY_SYMBOLS = {
     AED: '🇦🇪 د.إ', AFN: '🇦🇫 Af', ALL: '🇦🇱 L', AMD: '🇦🇲 ֏', ANG: '🇦🇼 ƒ',
@@ -52,24 +58,10 @@
 
   const VALID_CURRENCY_CODES = new Set(Object.keys(CURRENCY_SYMBOLS));
 
-  function escapeRegExp(value) {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  }
-
-  const SYMBOL_PATTERN = Object.keys(SYMBOL_TO_CURRENCY)
-    .sort((a, b) => b.length - a.length)
-    .map(escapeRegExp)
-    .join('|');
-
-  const REGEX_SYMBOL_BEFORE = new RegExp(`(${SYMBOL_PATTERN})\\s*([\\d,]+(?:\\.\\d{1,2})?)`);
-  const REGEX_SYMBOL_AFTER = new RegExp(`([\\d,]+(?:\\.\\d{1,2})?)\\s*(${SYMBOL_PATTERN})`);
-  const REGEX_CODE_AFTER = /([\d,]+(?:\.\d{1,2})?)\s*([A-Z]{3})\b/;
-  const REGEX_CODE_BEFORE = /\b([A-Z]{3})\s*([\d,]+(?:\.\d{1,2})?)/;
-
-  const REGEX_SYMBOL_BEFORE_EU = new RegExp(`(${SYMBOL_PATTERN})\\s*([\\d.]+(?:,\\d{1,2})?)`);
-  const REGEX_SYMBOL_AFTER_EU = new RegExp(`([\\d.]+(?:,\\d{1,2})?)\\s*(${SYMBOL_PATTERN})`);
-  const REGEX_CODE_AFTER_EU = /([\d.]+(?:,\d{1,2})?)\s*([A-Z]{3})\b/;
-  const REGEX_CODE_BEFORE_EU = /\b([A-Z]{3})\s*([\d.]+(?:,\d{1,2})?)/;
+  const parseCurrency = globalThis.HCCCurrencyParser.createCurrencyParser({
+    symbolToCurrency: SYMBOL_TO_CURRENCY,
+    validCurrencyCodes: VALID_CURRENCY_CODES
+  });
   const DEFAULT_TARGET_CURRENCY = 'EUR';
   const DEFAULT_DECIMAL_PLACES = 2;
   const VALID_TOOLTIP_POSITIONS = new Set(['above', 'below', 'left', 'right']);
@@ -255,43 +247,6 @@
       currentElement.classList.remove('hcc-highlight');
       currentElement = null;
     }
-  }
-
-  function parseCurrency(text) {
-    let match, currency, amount;
-    if ((match = text.match(REGEX_SYMBOL_BEFORE))) {
-      currency = SYMBOL_TO_CURRENCY[match[1]];
-      amount = parseFloat(match[2].replace(/,/g, ''));
-    } else if ((match = text.match(REGEX_SYMBOL_AFTER))) {
-      currency = SYMBOL_TO_CURRENCY[match[2]];
-      amount = parseFloat(match[1].replace(/,/g, ''));
-    } else if ((match = text.match(REGEX_CODE_BEFORE))) {
-      currency = match[1];
-      if (!VALID_CURRENCY_CODES.has(currency)) currency = null;
-      amount = parseFloat(match[2].replace(/,/g, ''));
-    } else if ((match = text.match(REGEX_CODE_AFTER))) {
-      currency = match[2];
-      if (!VALID_CURRENCY_CODES.has(currency)) currency = null;
-      amount = parseFloat(match[1].replace(/,/g, ''));
-    } else if ((match = text.match(REGEX_SYMBOL_BEFORE_EU))) {
-      currency = SYMBOL_TO_CURRENCY[match[1]];
-      amount = parseFloat(match[2].replace(/\./g, '').replace(',', '.'));
-    } else if ((match = text.match(REGEX_SYMBOL_AFTER_EU))) {
-      currency = SYMBOL_TO_CURRENCY[match[2]];
-      amount = parseFloat(match[1].replace(/\./g, '').replace(',', '.'));
-    } else if ((match = text.match(REGEX_CODE_BEFORE_EU))) {
-      currency = match[1];
-      if (!VALID_CURRENCY_CODES.has(currency)) currency = null;
-      amount = parseFloat(match[2].replace(/\./g, '').replace(',', '.'));
-    } else if ((match = text.match(REGEX_CODE_AFTER_EU))) {
-      currency = match[2];
-      if (!VALID_CURRENCY_CODES.has(currency)) currency = null;
-      amount = parseFloat(match[1].replace(/\./g, '').replace(',', '.'));
-    }
-    if (currency && !isNaN(amount) && amount > 0) {
-      return { currency, amount };
-    }
-    return null;
   }
 
   function findCurrencyInText(element) {
@@ -563,7 +518,7 @@
       }
 
       enabled = syncResult.enabled;
-      disabledSites = syncResult.disabledSites;
+      disabledSites = normalizeDisabledSites(syncResult.disabledSites);
       checkSiteEnabled();
       updateListenerState();
 
@@ -586,7 +541,7 @@
         updateListenerState();
       }
       if (areaName === 'sync' && changes.disabledSites) {
-        disabledSites = changes.disabledSites.newValue;
+        disabledSites = normalizeDisabledSites(changes.disabledSites.newValue);
         checkSiteEnabled();
         updateListenerState();
       }

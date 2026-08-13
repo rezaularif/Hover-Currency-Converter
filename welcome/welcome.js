@@ -5,22 +5,15 @@
      // Get the current tab and open the side panel
      try {
        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-       if (tab) {
-         await chrome.sidePanel.open({ windowId: tab.windowId });
-       }
+       if (!tab) throw new Error('No active tab available');
+       await chrome.sidePanel.open({ windowId: tab.windowId });
      } catch (error) {
-       console.log('Could not open side panel:', error);
+       console.error('Could not open side panel:', error);
+       return;
      }
      
      // Close this welcome tab
      window.close();
    });
    
-   // Keyboard accessibility
-   getStartedBtn.addEventListener('keydown', (e) => {
-     if (e.key === 'Enter' || e.key === ' ') {
-       e.preventDefault();
-       getStartedBtn.click();
-     }
-   });
  });

@@ -1,8 +1,8 @@
 # Support — Hover Currency Converter
 
 ## Contact
-- **Support email:** [ADD SUPPORT EMAIL]
-- **Website:** [ADD WEBSITE]
+- **Support email:** [hi@rezaularif.com](mailto:hi@rezaularif.com)
+- **Website:** [Hover Currency Converter on GitHub](https://github.com/rezaularif/Hover-Currency-Converter)
 
 ## FAQ
 
@@ -21,5 +21,4 @@ No. See `PRIVACY_POLICY.md`.
 
 ### Exchange rates look outdated—what should I do?
 Rates are cached for about an hour. Try waiting, or disable/enable the extension, or restart Chrome to refresh.
-
 

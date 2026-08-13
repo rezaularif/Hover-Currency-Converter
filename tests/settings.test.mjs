@@ -2,11 +2,30 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  collectChangedSettings,
   DEFAULT_LOCAL_SETTINGS,
   DEFAULT_SYNC_SETTINGS,
+  VALID_RESULT_GRADIENTS,
   resolveLocalSettings,
   resolveSyncSettings
 } from '../lib/settings.js';
+import { RESULT_GRADIENT_STYLES } from '../lib/result-gradients.js';
+
+test('every valid result gradient has a style definition', () => {
+  for (const gradient of VALID_RESULT_GRADIENTS) {
+    assert.ok(RESULT_GRADIENT_STYLES[gradient], `${gradient} is missing a style definition`);
+  }
+});
+
+test('collectChangedSettings returns only normalized values that changed', () => {
+  assert.deepEqual(
+    collectChangedSettings(
+      { enabled: true, disabledSites: ['example.com'], targetCurrency: 'USD' },
+      { enabled: true, disabledSites: ['example.com'], targetCurrency: 'EUR' }
+    ),
+    { targetCurrency: 'EUR' }
+  );
+});
 
 test('resolveSyncSettings falls back to valid currency defaults and safe site list', () => {
   const resolved = resolveSyncSettings(

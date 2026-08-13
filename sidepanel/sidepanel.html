@@ -17,11 +17,11 @@
     <section class="section">
       <label class="section-label">Target Currency</label>
       <div class="custom-select-wrapper custom-select-full">
-        <button type="button" id="targetCurrencyBtn" class="custom-select-btn custom-select-btn-full" aria-label="Select target currency" aria-haspopup="listbox" aria-expanded="false">
+        <button type="button" id="targetCurrencyBtn" class="custom-select-btn custom-select-btn-full" aria-label="Select target currency" aria-haspopup="listbox" aria-expanded="false" aria-controls="targetCurrencyList">
           <span id="targetCurrencyDisplay">🇪🇺 EUR - Euro</span>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
         </button>
-        <div id="targetCurrencyDropdown" class="custom-dropdown custom-dropdown-full hidden" role="listbox" aria-label="Target currency options">
+        <div id="targetCurrencyDropdown" class="custom-dropdown custom-dropdown-full hidden">
           <div class="dropdown-search-wrap">
             <input
               type="text"
@@ -29,11 +29,15 @@
               class="dropdown-search-input"
               placeholder="Search code or name"
               aria-label="Search target currency"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-controls="targetCurrencyList"
+              aria-expanded="false"
               autocomplete="off"
               spellcheck="false"
             >
           </div>
-          <div class="dropdown-list" id="targetCurrencyList"></div>
+          <div class="dropdown-list" id="targetCurrencyList" role="listbox" aria-label="Target currency options"></div>
           <div id="targetCurrencyNoResults" class="dropdown-empty">No currencies found</div>
         </div>
         <select id="targetCurrency" style="display:none;">
@@ -46,18 +50,9 @@
       <label class="section-label">Quick Convert</label>
       <div class="converter-row">
         <input type="number" id="fromAmount" class="amount-input" placeholder="Enter amount" value="100" aria-label="Amount to convert">
-        <div class="custom-select-wrapper">
-          <button type="button" id="fromCurrencyBtn" class="custom-select-btn" aria-label="Select source currency" aria-haspopup="listbox" aria-expanded="false">
-            <span id="fromCurrencyDisplay">🇺🇸 USD</span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
-          </button>
-          <div id="fromCurrencyDropdown" class="custom-dropdown hidden" role="listbox" aria-label="Source currency options">
-            <div class="dropdown-list" id="fromCurrencyList"></div>
-          </div>
-          <select id="fromCurrency" class="hidden-select" style="display:none;">
-            <option value="">...</option>
-          </select>
-        </div>
+        <select id="fromCurrency" class="source-currency-select" aria-label="Select source currency">
+          <option value="">Loading…</option>
+        </select>
       </div>
       <button class="swap-btn" id="swapBtn" title="Swap currencies" aria-label="Swap source and target currencies">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

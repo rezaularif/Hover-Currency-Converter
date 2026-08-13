@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hover Currency Converter Stress Test</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 40px; color: #172033; }
+    main { display: grid; grid-template-columns: repeat(2, minmax(260px, 1fr)); gap: 20px; }
+    article, button { padding: 24px; border: 1px solid #cbd5e1; border-radius: 12px; background: white; font-size: 18px; }
+    strong { display: block; margin-top: 12px; font-size: 24px; }
+  </style>
+</head>
+<body>
+  <h1>Currency format stress test</h1>
+  <main>
+    <article>Reported EU decimal regression<strong id="eu-decimal">€10,39</strong></article>
+    <article>EU grouped amount<strong id="eu-grouped">€1.039,00</strong></article>
+    <article>US grouped amount<strong id="us-grouped">$1,039.00</strong></article>
+    <article>ISO code before amount<strong id="code-before">USD 1,234.56</strong></article>
+    <article>ISO code after amount<strong id="code-after">1.234,56 EUR</strong></article>
+    <button id="button-price" type="button">Button price: R$ 19,99</button>
+    <article>Spaced thousands<strong id="spaced">€1 234,56</strong></article>
+    <article>Symbol after amount<strong id="symbol-after">49 €</strong></article>
+    <article>Indian grouped amount<strong id="indian-grouped">₹1,23,456</strong></article>
+  </main>
+</body>
+</html>

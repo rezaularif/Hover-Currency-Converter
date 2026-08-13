@@ -1,64 +1,26 @@
 import {
+  collectChangedSettings,
   DEFAULT_LOCAL_SETTINGS,
   DEFAULT_SYNC_SETTINGS,
   resolveLocalSettings,
   resolveSyncSettings
 } from '../lib/settings.js';
+import { fetchJsonWithRetry } from '../lib/network.js';
 
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
 const API_TIMEOUT_MS = 10000;
 const API_BASE = 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1';
 const API_FALLBACK = 'https://latest.currency-api.pages.dev/v1';
 
-// Currency decimal places configuration (ISO 4217 standard)
-const CURRENCY_DECIMALS = {
-  // Zero decimal currencies
-  BIF: 0, CLP: 0, DJF: 0, GNF: 0, IDR: 0, JPY: 0, KMF: 0, KRW: 0,
-  PYG: 0, RWF: 0, UGX: 0, VND: 0, VUV: 0, XAF: 0, XOF: 0, XPF: 0,
-  // Three decimal currencies
-  BHD: 3, IQD: 3, JOD: 3, KWD: 3, LYD: 3, OMR: 3, TND: 3
-};
-
 function getCurrencyDecimals(currencyCode) {
-  return CURRENCY_DECIMALS[currencyCode] ?? 2; // Default to 2 decimals
-}
-
-// Retry with exponential backoff
-async function fetchWithRetry(url, maxAttempts = 3) {
-  let lastError;
-
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
-      const response = await fetch(url, { signal: controller.signal }).finally(() => {
-        clearTimeout(timeoutId);
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      // Validate response structure
-      if (!data || typeof data !== 'object') {
-        throw new Error('Invalid API response structure');
-      }
-
-      return data;
-    } catch (error) {
-      lastError = error;
-
-      if (attempt < maxAttempts - 1) {
-        // Exponential backoff: 1s, 2s, 4s
-        const delay = Math.pow(2, attempt) * 1000;
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-    }
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: currencyCode
+    }).resolvedOptions().maximumFractionDigits;
+  } catch {
+    return 2;
   }
-
-  throw lastError;
 }
 
 // Promise-based lock to prevent concurrent fetches
@@ -92,10 +54,9 @@ async function fetchRates() {
 
       let data;
       try {
-        data = await fetchWithRetry(`${API_BASE}/currencies/usd.json`);
+        data = await fetchJsonWithRetry(`${API_BASE}/currencies/usd.json`, { timeoutMs: API_TIMEOUT_MS });
       } catch (e) {
-        // Try fallback API
-        data = await fetchWithRetry(`${API_FALLBACK}/currencies/usd.json`);
+        data = await fetchJsonWithRetry(`${API_FALLBACK}/currencies/usd.json`, { timeoutMs: API_TIMEOUT_MS });
       }
 
       if (data && data.usd) {
@@ -167,23 +128,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-function collectChangedSettings(currentValues, normalizedValues) {
-  const updates = {};
-
-  for (const [key, normalizedValue] of Object.entries(normalizedValues)) {
-    const currentValue = currentValues[key];
-    const hasChanged = Array.isArray(normalizedValue)
-      ? JSON.stringify(currentValue) !== JSON.stringify(normalizedValue)
-      : currentValue !== normalizedValue;
-
-    if (hasChanged) {
-      updates[key] = normalizedValue;
-    }
-  }
-
-  return updates;
-}
-
 // Inject content script if needed and open side panel when extension icon is clicked
 chrome.action.onClicked.addListener(async (tab) => {
   try {
@@ -206,7 +150,7 @@ chrome.action.onClicked.addListener(async (tab) => {
       try {
         await chrome.scripting.executeScript({
           target: { tabId: tab.id },
-          files: ['content/content.js']
+          files: ['lib/settings-core.js', 'lib/currency-parser.js', 'content/content.js']
         });
 
         await chrome.scripting.insertCSS({

@@ -14,11 +14,11 @@ Hover Currency Converter is a Chrome extension that allows users to instantly se
 - Creates hover tooltips showing converted amounts
 - Handles both inline prices and text-based prices
 
-### 2. Currency Conversion (utils/currencies.js)
-- Fetches exchange rates from public APIs
-- Caches rates for 24 hours to minimize API calls
-- Supports 150+ currencies
-- Fallback API endpoints for reliability
+### 2. Currency Conversion (background/service-worker.js)
+- Fetches and caches exchange rates from public APIs
+- Caches rates for one hour to minimize API calls
+- Uses primary and fallback API endpoints with retries and request timeouts
+- Supports fiat currencies returned by the configured API
 
 ### 3. Side Panel UI (sidepanel/)
 - User settings interface
@@ -30,6 +30,7 @@ Hover Currency Converter is a Chrome extension that allows users to instantly se
 - Manages side panel
 - Handles welcome page on first install
 - Auto-injects content scripts
+- Fetches and caches exchange rates for one hour
 
 ## Architecture
 
@@ -44,7 +45,7 @@ Hover Currency Converter is a Chrome extension that allows users to instantly se
 2. Content script scans for currency patterns
 3. On hover, fetches exchange rate (from cache or API)
 4. Displays converted amount in tooltip
-5. User preferences stored in chrome.storage.local
+5. Synced preferences are stored in chrome.storage.sync and device-local preferences and caches use chrome.storage.local
 
 ## Key Files
 
@@ -53,7 +54,9 @@ Hover Currency Converter is a Chrome extension that allows users to instantly se
 - `content/content.css` - Tooltip styling
 - `background/service-worker.js` - Background tasks
 - `sidepanel/sidepanel.js` - Settings UI logic
-- `utils/currencies.js` - Currency utilities and API calls
+- `lib/currency-parser.js` - Locale-aware price parsing shared with the content script
+- `lib/network.js` - Retried, timeout-bounded JSON requests
+- `lib/settings.js` - Shared settings defaults and normalization
 
 ## Technical Constraints
 
@@ -77,8 +80,8 @@ Fallback: `https://latest.currency-api.pages.dev/v1/currencies/{from}.json`
 - No user tracking or analytics
 - No personal data collection
 - All processing happens locally
-- Exchange rates cached locally for 24 hours
-- Settings stored in chrome.storage.local only
+- Exchange rates cached locally for one hour
+- Cross-device preferences use chrome.storage.sync; caches and display settings use chrome.storage.local
 
 ## Development Guidelines
 
@@ -126,6 +129,8 @@ Fallback: `https://latest.currency-api.pages.dev/v1/currencies/{from}.json`
 
 ## Version History
 
+- v1.0.8 - Locale-aware parsing, resilient networking, expanded customization, and regression coverage
+- v1.0.7 - Settings repair and normalization
 - v1.0.4 - Added auto-injection, welcome page, improved detection
 - v1.0.2 - Chrome Web Store submission
 - v1.0.1 - Improved robustness and accessibility

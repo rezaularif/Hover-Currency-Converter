@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.0.8] - 2026-08-13
+
+### Fixed
+- Correctly parse decimal-comma prices such as `€10,39` without treating them as values 100 times larger.
+- Improved parsing for European, US, Indian, spaced, symbol-after, and ISO-code price formats.
+- Added resilient exchange-rate and currency-list requests with timeouts, exponential backoff, and cached fallbacks.
+- Hardened corrupted-setting recovery, unavailable-currency states, and result-gradient fallback behavior.
+- Corrected shared-currency flag presentation for ANG and XCD.
+
+### Improved
+- Added searchable currency selection, native source selection, accessible controls, expanded tooltip themes, and additional result gradients.
+- Kept global and per-site enable controls synchronized using the active website's dynamically detected root domain.
+- Simplified duplicated settings, theme, flag, and currency metadata logic while preserving existing functionality.
+- Added automated parser, network, settings, gradient-coverage, and browser stress-test fixtures.
+
 ## [1.0.7] - 2026-03-06
 
 ### Fixed
