@@ -3,17 +3,24 @@ import {
   DEFAULT_LOCAL_SETTINGS,
   DEFAULT_SYNC_SETTINGS,
   VALID_RESULT_GRADIENTS,
+  getSiteCurrency,
   normalizeDisabledSites,
+  normalizeSiteCurrencies,
+  normalizeSymbolCurrencies,
+  getRootDomain,
+  getSiteKeys,
   resolveDisplaySettings,
   resolveLocalSettings,
   resolveSyncSettings
 } from '../lib/settings.js';
 import { fetchJsonWithRetry } from '../lib/network.js';
 import { RESULT_GRADIENT_STYLES } from '../lib/result-gradients.js';
+import '../lib/currencies.js';
+import '../lib/currency-detection.js';
+import { createCurrencyPicker } from './currency-picker.js';
 
-const FLAG_OVERRIDES = {
-  ANG: '🇨🇼', XAF: '🇨🇲', XCD: '🌐', XDR: '🌐', XOF: '🇧🇯', XPF: '🇵🇫'
-};
+const { getFlag } = globalThis.HCCCurrencies;
+const { SYMBOL_GROUPS } = globalThis.HCCCurrencyDetection;
 
 const ISO_FIAT_CODES = new Set(
   Intl.supportedValuesOf('currency').map(code => code.toLowerCase())
@@ -43,7 +50,6 @@ const DEFAULT_TARGET_CURRENCY = DEFAULT_SYNC_SETTINGS.targetCurrency;
 const DEFAULT_FROM_CURRENCY = DEFAULT_SYNC_SETTINGS.fromCurrency;
 const DEFAULT_RESULT_GRADIENT = DEFAULT_LOCAL_SETTINGS.resultGradient;
 
-let allCurrencies = null;
 async function fetchCurrencies() {
   const now = Date.now();
   let cached = {
@@ -79,22 +85,6 @@ async function fetchCurrencies() {
   }
 }
 
-function countryCodeToFlag(countryCode) {
-  if (!/^[A-Z]{2}$/.test(countryCode)) return null;
-  const base = 127397;
-  return String.fromCodePoint(
-    countryCode.charCodeAt(0) + base,
-    countryCode.charCodeAt(1) + base
-  );
-}
-
-function getFlag(code) {
-  const upperCode = code.toUpperCase();
-  if (FLAG_OVERRIDES[upperCode]) return FLAG_OVERRIDES[upperCode];
-  const derivedFlag = countryCodeToFlag(upperCode.slice(0, 2));
-  return derivedFlag || '💱';
-}
-
 const POPULAR_CURRENCIES = ['usd', 'eur', 'gbp', 'jpy', 'cny', 'inr', 'cad', 'aud', 'chf', 'krw'];
 
 function isFiatCurrencyEntry(code, name) {
@@ -113,14 +103,30 @@ function isFiatCurrencyEntry(code, name) {
   return true;
 }
 
-function getOrderedFiatCodes(currencies) {
-  const allCodes = Object.entries(currencies)
+const currencyEntriesCache = new WeakMap();
+
+function getCurrencyEntries(currencies) {
+  if (currencyEntriesCache.has(currencies)) return currencyEntriesCache.get(currencies);
+
+  const fiatCodes = Object.entries(currencies)
     .filter(([code, name]) => isFiatCurrencyEntry(code, name))
     .map(([code]) => code.toLowerCase());
-
-  const popular = POPULAR_CURRENCIES.filter(code => allCodes.includes(code));
-  const others = allCodes.filter(code => !POPULAR_CURRENCIES.includes(code)).sort();
-  return [...popular, ...others];
+  const popular = POPULAR_CURRENCIES.filter(code => fiatCodes.includes(code));
+  const others = fiatCodes.filter(code => !POPULAR_CURRENCIES.includes(code)).sort();
+  const list = [...popular, ...others].map(code => {
+    const upperCode = code.toUpperCase();
+    const flag = getFlag(upperCode);
+    const name = currencies[code] || upperCode;
+    return {
+      code: upperCode,
+      label: `${flag} ${upperCode} - ${name}`,
+      shortLabel: `${flag} ${upperCode}`,
+      search: `${upperCode} ${name}`.toLowerCase()
+    };
+  });
+  const entries = { list, byCode: new Map(list.map(entry => [entry.code, entry])) };
+  currencyEntriesCache.set(currencies, entries);
+  return entries;
 }
 
 function persistCurrencySelection(partial) {
@@ -151,38 +157,11 @@ function persistCurrencySelection(partial) {
   }
 }
 
-function populateCurrencySelect(selectElement, currencies, selectedValue, isSmall = false) {
-  selectElement.textContent = '';
-  const orderedCodes = getOrderedFiatCodes(currencies);
-
-  for (const code of orderedCodes) {
-    const option = createOption(code, currencies[code], selectedValue, isSmall);
-    selectElement.appendChild(option);
-  }
-}
-
-function createOption(code, name, selectedValue, isSmall) {
-  const option = document.createElement('option');
-  option.value = code.toUpperCase();
-  const flag = getFlag(code);
-  if (isSmall) {
-    option.textContent = `${flag} ${code.toUpperCase()}`;
-  } else {
-    option.textContent = `${flag} ${code.toUpperCase()} - ${name}`;
-  }
-  if (code.toUpperCase() === selectedValue) {
-    option.selected = true;
-  }
-  return option;
-}
-  
 let currentDecimalPlaces = 2;
 
 document.addEventListener('DOMContentLoaded', () => {
   const enableToggle = document.getElementById('enableToggle');
-  const targetCurrency = document.getElementById('targetCurrency');
   const fromAmount = document.getElementById('fromAmount');
-  const fromCurrency = document.getElementById('fromCurrency');
   const convertResult = document.getElementById('convertResult');
   const resultCurrency = document.getElementById('resultCurrency');
   const statusDot = document.querySelector('.status-dot');
@@ -194,103 +173,136 @@ document.addEventListener('DOMContentLoaded', () => {
   const resultGradientSelect = document.getElementById('resultGradient');
   
 
-  // Per-site toggle elements
+  // Per-site elements
   const siteToggle = document.getElementById('siteToggle');
   const siteToggleRow = document.getElementById('siteToggleRow');
   const currentSiteDisplay = document.getElementById('currentSiteDisplay');
-
-  const MULTI_PART_TLDS = new Set([
-    'co.uk', 'org.uk', 'gov.uk', 'ac.uk',
-    'com.au', 'net.au', 'org.au',
-    'co.nz', 'co.jp', 'co.kr', 'co.in', 'co.id', 'co.za',
-    'com.br', 'com.mx', 'com.tr', 'com.sg', 'com.hk', 'com.cn', 'com.tw', 'com.ar', 'com.sa', 'com.eg', 'com.ng'
-  ]);
+  const siteCurrencyRow = document.getElementById('siteCurrencyRow');
+  const siteCurrencySite = document.getElementById('siteCurrencySite');
+  const siteCurrencySelect = document.getElementById('siteCurrency');
+  const symbolDetails = document.getElementById('symbolDetails');
+  const symbolCurrencyList = document.getElementById('symbolCurrencyList');
 
   let currentRootDomain = null;
   let currentSiteKeys = [];
-  let disabledSites = [];
+  let siteContextRequest = 0;
+  let syncWriteQueue = Promise.resolve();
   let currenciesLoadFailed = false;
+  let currencyEntries = null;
+  let symbolDefaultsRendered = false;
 
   const converterSection = document.querySelector('.converter-section');
   
-  // Target currency custom dropdown elements
-  const targetCurrencyBtn = document.getElementById('targetCurrencyBtn');
-  const targetCurrencyDisplay = document.getElementById('targetCurrencyDisplay');
-  const targetCurrencyDropdown = document.getElementById('targetCurrencyDropdown');
-  const targetCurrencyList = document.getElementById('targetCurrencyList');
-  const targetCurrencySearch = document.getElementById('targetCurrencySearch');
-  const targetCurrencyNoResults = document.getElementById('targetCurrencyNoResults');
-  const targetCurrencyWrapper = document.querySelector('.custom-select-full');
-  const targetSection = targetCurrencyWrapper ? targetCurrencyWrapper.closest('.section') : null;
-  targetCurrencyBtn.setAttribute('aria-expanded', 'false');
+  const targetPicker = createCurrencyPicker(document.getElementById('targetCurrencyPicker'), {
+    idPrefix: 'target-currency',
+    onSelect: selectTargetCurrency
+  });
+  const sourcePicker = createCurrencyPicker(document.getElementById('sourceCurrencyPicker'), {
+    idPrefix: 'source-currency',
+    compact: true,
+    onSelect: selectSourceCurrency
+  });
 
-  function normalizeHostname(hostname) {
-    return hostname.toLowerCase().replace(/\.$/, '');
+  function queueSyncWrite(write) {
+    syncWriteQueue = syncWriteQueue.then(write).catch(error => {
+      console.error('Failed to save settings:', error);
+    });
+    return syncWriteQueue;
   }
 
-  function isIpAddress(hostname) {
-    return /^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname) || hostname.includes(':');
+  function setSiteContext(rootDomain, siteKeys) {
+    currentRootDomain = rootDomain;
+    currentSiteKeys = siteKeys;
+    const display = rootDomain ? '' : 'none';
+    siteToggleRow.style.display = display;
+    siteCurrencyRow.style.display = display;
   }
 
-  function getLegacyRootDomain(hostname) {
-    const normalized = normalizeHostname(hostname);
-    const parts = normalized.split('.');
-    if (parts.length <= 2) return normalized;
-    return parts.slice(-2).join('.');
-  }
-
-  function getRootDomain(hostname) {
-    const normalized = normalizeHostname(hostname);
-    if (!normalized || normalized === 'localhost' || isIpAddress(normalized)) {
-      return normalized;
-    }
-
-    const parts = normalized.split('.');
-    if (parts.length <= 2) {
-      return normalized;
-    }
-
-    const lastTwo = parts.slice(-2).join('.');
-    if (MULTI_PART_TLDS.has(lastTwo) && parts.length >= 3) {
-      return parts.slice(-3).join('.');
-    }
-
-    return lastTwo;
-  }
-
-  function getSiteKeys(hostname) {
-    const rootDomain = getRootDomain(hostname);
-    const legacyRootDomain = getLegacyRootDomain(hostname);
-    if (rootDomain === legacyRootDomain) {
-      return [rootDomain];
-    }
-    return [rootDomain, legacyRootDomain];
-  }
-
-  async function initSiteToggle() {
-    if (!siteToggle || !siteToggleRow || !currentSiteDisplay) return;
+  async function refreshSiteContext() {
+    const request = ++siteContextRequest;
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tab && tab.url) {
-        const url = new URL(tab.url);
-        if (url.protocol === 'http:' || url.protocol === 'https:') {
-          currentRootDomain = getRootDomain(url.hostname);
-          currentSiteKeys = getSiteKeys(url.hostname);
-          currentSiteDisplay.textContent = currentRootDomain;
-          siteToggleRow.style.display = '';
-
-          const stored = await chrome.storage.sync.get({ disabledSites: [] });
-          disabledSites = normalizeDisabledSites(stored.disabledSites);
-          siteToggle.checked = !disabledSites.some(site => currentSiteKeys.includes(site));
-        } else {
-          siteToggleRow.style.display = 'none';
-        }
-      } else {
-        siteToggleRow.style.display = 'none';
+      const url = tab?.url ? new URL(tab.url) : null;
+      if (!url || (url.protocol !== 'http:' && url.protocol !== 'https:')) {
+        if (request === siteContextRequest) setSiteContext(null, []);
+        return;
       }
+
+      const rootDomain = getRootDomain(url.hostname);
+      const siteKeys = getSiteKeys(url.hostname);
+      const stored = await chrome.storage.sync.get({ disabledSites: [], siteCurrencies: {} });
+      if (request !== siteContextRequest) return;
+
+      currentSiteDisplay.textContent = rootDomain;
+      siteCurrencySite.textContent = rootDomain;
+      siteToggle.checked = !normalizeDisabledSites(stored.disabledSites).some(site => siteKeys.includes(site));
+      siteCurrencySelect.value = getSiteCurrency(normalizeSiteCurrencies(stored.siteCurrencies), siteKeys) || '';
+      setSiteContext(rootDomain, siteKeys);
     } catch (error) {
-      console.error('Failed to init site toggle:', error);
-      siteToggleRow.style.display = 'none';
+      console.error('Failed to load site settings:', error);
+      if (request === siteContextRequest) setSiteContext(null, []);
+    }
+  }
+
+  function createCurrencyOption(code) {
+    const option = document.createElement('option');
+    option.value = code;
+    option.textContent = `${getFlag(code)} ${code}`;
+    return option;
+  }
+
+  function createAutoOption(label) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = label;
+    return option;
+  }
+
+  function populateSiteCurrencySelect() {
+    const listedCodes = new Set();
+    const optionGroups = [];
+    for (const group of Object.values(SYMBOL_GROUPS)) {
+      const codes = group.candidates.filter(code => !listedCodes.has(code));
+      if (codes.length === 0) continue;
+      const optionGroup = document.createElement('optgroup');
+      optionGroup.label = `${group.label} prices`;
+      for (const code of codes) {
+        listedCodes.add(code);
+        optionGroup.appendChild(createCurrencyOption(code));
+      }
+      optionGroups.push(optionGroup);
+    }
+    siteCurrencySelect.replaceChildren(createAutoOption('Auto-detect'), ...optionGroups);
+  }
+
+  function populateSymbolCurrencyList(symbolCurrencies) {
+    const rows = Object.entries(SYMBOL_GROUPS).map(([symbol, group]) => {
+      const row = document.createElement('div');
+      row.className = 'preference-row symbol-row';
+      const label = document.createElement('span');
+      label.className = 'preference-label';
+      label.textContent = group.label;
+      const select = document.createElement('select');
+      select.className = 'preference-select';
+      select.dataset.symbol = symbol;
+      select.setAttribute('aria-label', `Default currency for ${group.label}`);
+      select.replaceChildren(createAutoOption('Auto'), ...group.candidates.map(createCurrencyOption));
+      select.value = Object.hasOwn(symbolCurrencies, symbol) ? symbolCurrencies[symbol] : '';
+      row.append(label, select);
+      return row;
+    });
+    symbolCurrencyList.replaceChildren(...rows);
+  }
+
+  async function renderSymbolDefaults() {
+    if (symbolDefaultsRendered) return;
+    symbolDefaultsRendered = true;
+    try {
+      const stored = await chrome.storage.sync.get({ symbolCurrencies: {} });
+      populateSymbolCurrencyList(normalizeSymbolCurrencies(stored.symbolCurrencies));
+    } catch (error) {
+      console.error('Failed to load currency detection settings:', error);
+      populateSymbolCurrencyList({});
     }
   }
 
@@ -303,7 +315,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       currenciesLoadFailed = false;
-      allCurrencies = currencies;
+      currencyEntries = getCurrencyEntries(currencies);
 
       const [syncSaved, localSaved] = await Promise.all([
         chrome.storage.sync.get({
@@ -320,7 +332,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const normalizedLocalSettings = resolveLocalSettings(localSaved, normalizedSyncSettings);
       const resolvedTarget = normalizedSyncSettings.targetCurrency;
       const resolvedFrom = normalizedSyncSettings.fromCurrency;
-      const availableCodes = getOrderedFiatCodes(currencies).map(code => code.toUpperCase());
+      const availableCodes = currencyEntries.list.map(entry => entry.code);
       const availableSet = new Set(availableCodes);
       const firstAvailableCode = availableCodes[0] || DEFAULT_TARGET_CURRENCY;
 
@@ -344,9 +356,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       }
 
-      populateCurrencySelect(targetCurrency, currencies, savedTarget, false);
-      populateCurrencySelect(fromCurrency, currencies, savedFrom, true);
-      populateTargetCurrencyDropdown(currencies, savedTarget);
+      targetPicker.setEntries(currencyEntries, savedTarget);
+      sourcePicker.setEntries(currencyEntries, savedFrom);
 
       resultCurrency.textContent = savedTarget;
       doQuickConvert();
@@ -358,16 +369,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function setCurrenciesUnavailable() {
     currenciesLoadFailed = true;
-    targetCurrencyBtn.disabled = true;
-    fromCurrency.disabled = true;
-    fromCurrency.textContent = '';
-    const unavailableOption = document.createElement('option');
-    unavailableOption.value = '';
-    unavailableOption.textContent = 'Unavailable';
-    fromCurrency.appendChild(unavailableOption);
+    targetPicker.setUnavailable('Unavailable');
+    sourcePicker.setUnavailable('Unavailable');
     swapBtn.disabled = true;
-    targetCurrencyBtn.setAttribute('aria-disabled', 'true');
-    targetCurrencyDisplay.textContent = 'Unavailable';
     resultCurrency.textContent = '--';
     convertResult.querySelector('.result-amount').textContent = 'Error';
     statusDot.classList.remove('success');
@@ -375,266 +379,30 @@ document.addEventListener('DOMContentLoaded', () => {
     statusText.textContent = 'Failed to load currency list';
   }
   
-  function populateTargetCurrencyDropdown(currencies, selectedValue) {
-    targetCurrencyList.textContent = '';
-    const orderedCodes = getOrderedFiatCodes(currencies);
-
-    for (const code of orderedCodes) {
-      const item = document.createElement('div');
-      item.className = 'dropdown-item';
-      item.dataset.value = code.toUpperCase();
-      item.id = `target-currency-option-${code.toLowerCase()}`;
-      item.setAttribute('role', 'option');
-      item.setAttribute('aria-selected', String(code.toUpperCase() === selectedValue));
-      item.tabIndex = -1;
-      const flag = getFlag(code);
-      const name = currencies[code] || code.toUpperCase();
-      item.dataset.search = `${code.toUpperCase()} ${name}`.toLowerCase();
-      item.textContent = `${flag} ${code.toUpperCase()} - ${name}`;
-      
-      if (code.toUpperCase() === selectedValue) {
-        item.classList.add('selected');
-        targetCurrencyDisplay.textContent = `${flag} ${code.toUpperCase()} - ${name}`;
-        setActiveOption(targetCurrencyBtn, item);
-      }
-      
-      item.addEventListener('click', () => {
-        selectTargetCurrency(code.toUpperCase(), `${flag} ${code.toUpperCase()} - ${name}`);
-      });
-      
-      targetCurrencyList.appendChild(item);
-    }
-
-    filterTargetCurrencyDropdown(targetCurrencySearch?.value || '');
+  function selectTargetCurrency(code) {
+    resultCurrency.textContent = code;
+    persistCurrencySelection({ targetCurrency: code });
+    doQuickConvert();
   }
 
-  function filterTargetCurrencyDropdown(query) {
-    const normalizedQuery = (query || '').trim().toLowerCase();
-    let visibleCount = 0;
-    const totalItems = targetCurrencyList.querySelectorAll('.dropdown-item').length;
-
-    targetCurrencyList.querySelectorAll('.dropdown-item').forEach(item => {
-      const matches = !normalizedQuery || item.dataset.search.includes(normalizedQuery);
-      item.style.display = matches ? '' : 'none';
-      if (matches) visibleCount++;
-    });
-
-    if (targetCurrencyNoResults) {
-      targetCurrencyNoResults.classList.toggle('visible', totalItems > 0 && visibleCount === 0);
-    }
-  }
-
-  function getFirstVisibleTargetCurrencyItem() {
-    return Array.from(targetCurrencyList.querySelectorAll('.dropdown-item')).find(item => item.style.display !== 'none') || null;
-  }
-
-  function getVisibleCurrencyItems(list) {
-    return Array.from(list.querySelectorAll('.dropdown-item')).filter(item => item.style.display !== 'none');
-  }
-
-  function setActiveOption(button, item) {
-    if (!item) {
-      button.removeAttribute('aria-activedescendant');
-      targetCurrencySearch?.removeAttribute('aria-activedescendant');
-      return;
-    }
-    button.setAttribute('aria-activedescendant', item.id);
-    targetCurrencySearch?.setAttribute('aria-activedescendant', item.id);
-  }
-
-  function focusCurrencyItem(list, button, item) {
-    if (!item) return;
-    list.querySelectorAll('.dropdown-item').forEach(option => {
-      option.tabIndex = option === item ? 0 : -1;
-    });
-    setActiveOption(button, item);
-    item.focus();
-    item.scrollIntoView({ block: 'nearest' });
-  }
-
-  function focusInitialCurrencyItem(list, button, useLast = false) {
-    const visibleItems = getVisibleCurrencyItems(list);
-    const selectedItem = visibleItems.find(item => item.getAttribute('aria-selected') === 'true');
-    focusCurrencyItem(list, button, selectedItem || (useLast ? visibleItems.at(-1) : visibleItems[0]));
-  }
-
-  function moveCurrencyFocus(list, button, direction) {
-    const visibleItems = getVisibleCurrencyItems(list);
-    if (visibleItems.length === 0) return;
-
-    const activeIndex = visibleItems.indexOf(document.activeElement);
-    const currentIndex = activeIndex >= 0
-      ? activeIndex
-      : visibleItems.findIndex(item => item.id === button.getAttribute('aria-activedescendant'));
-    const nextIndex = currentIndex >= 0
-      ? (currentIndex + direction + visibleItems.length) % visibleItems.length
-      : (direction > 0 ? 0 : visibleItems.length - 1);
-    focusCurrencyItem(list, button, visibleItems[nextIndex]);
-  }
-
-  function updateSelectedOption(list, button, value) {
-    list.querySelectorAll('.dropdown-item').forEach(item => {
-      const isSelected = item.dataset.value === value;
-      item.classList.toggle('selected', isSelected);
-      item.setAttribute('aria-selected', String(isSelected));
-      if (isSelected) setActiveOption(button, item);
-    });
-  }
-
-  function handleCurrencyListKeydown(event, list, button, closeDropdown) {
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      event.preventDefault();
-      moveCurrencyFocus(list, button, event.key === 'ArrowDown' ? 1 : -1);
-      return;
-    }
-
-    if ((event.key === 'Enter' || event.key === ' ') && document.activeElement?.classList.contains('dropdown-item')) {
-      event.preventDefault();
-      document.activeElement.click();
-      button.focus();
-      return;
-    }
-
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      closeDropdown();
-      button.focus();
-    }
-  }
-
-  function resetTargetCurrencySearch() {
-    if (targetCurrencySearch) {
-      targetCurrencySearch.value = '';
-    }
-    filterTargetCurrencyDropdown('');
-  }
-  
-  function selectTargetCurrency(value, display) {
-    // Update hidden select for compatibility
-    targetCurrency.value = value;
-    
-    // Update display
-    targetCurrencyDisplay.textContent = display;
-    resultCurrency.textContent = value;
-    
-    // Update selected state
-    updateSelectedOption(targetCurrencyList, targetCurrencyBtn, value);
-    
-    // Close dropdown
-    closeTargetDropdown();
-    
-    // Save and convert
-    persistCurrencySelection({ targetCurrency: value });
+  function selectSourceCurrency(code) {
+    persistCurrencySelection({ fromCurrency: code });
     doQuickConvert();
   }
   
-  function toggleTargetDropdown() {
-    const isOpen = !targetCurrencyDropdown.classList.contains('hidden');
-    if (isOpen) {
-      closeTargetDropdown();
-    } else {
-      openTargetDropdown();
-    }
-  }
-  
-  function openTargetDropdown() {
-    if (targetCurrencyBtn.disabled) return;
-    targetCurrencyDropdown.classList.remove('hidden');
-    targetCurrencyWrapper.classList.add('open');
-    targetCurrencyBtn.setAttribute('aria-expanded', 'true');
-    if (targetCurrencySearch) targetCurrencySearch.setAttribute('aria-expanded', 'true');
-    if (targetSection) {
-      targetSection.classList.add('dropdown-open');
-    }
-    resetTargetCurrencySearch();
-    if (targetCurrencySearch) {
-      targetCurrencySearch.focus();
-    }
-  }
-  
-  function closeTargetDropdown() {
-    targetCurrencyDropdown.classList.add('hidden');
-    targetCurrencyWrapper.classList.remove('open');
-    targetCurrencyBtn.setAttribute('aria-expanded', 'false');
-    if (targetCurrencySearch) targetCurrencySearch.setAttribute('aria-expanded', 'false');
-    if (targetSection) {
-      targetSection.classList.remove('dropdown-open');
-    }
-    resetTargetCurrencySearch();
-  }
-  
-  targetCurrencyBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    toggleTargetDropdown();
-  });
-
-  targetCurrencyBtn.addEventListener('keydown', (event) => {
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      event.preventDefault();
-      if (targetCurrencyDropdown.classList.contains('hidden')) openTargetDropdown();
-      focusInitialCurrencyItem(targetCurrencyList, targetCurrencyBtn, event.key === 'ArrowUp');
-    } else if (event.key === 'Escape' && !targetCurrencyDropdown.classList.contains('hidden')) {
-      event.preventDefault();
-      closeTargetDropdown();
-    }
-  });
-
-  targetCurrencyList.addEventListener('keydown', (event) => {
-    handleCurrencyListKeydown(event, targetCurrencyList, targetCurrencyBtn, closeTargetDropdown);
-  });
-
-  if (targetCurrencySearch) {
-    targetCurrencySearch.addEventListener('click', (e) => {
-      e.stopPropagation();
-    });
-
-    targetCurrencySearch.addEventListener('input', () => {
-      filterTargetCurrencyDropdown(targetCurrencySearch.value);
-      setActiveOption(targetCurrencyBtn, getFirstVisibleTargetCurrencyItem());
-    });
-
-    targetCurrencySearch.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        closeTargetDropdown();
-        targetCurrencyBtn.focus();
-        return;
-      }
-
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        const activeItem = document.getElementById(targetCurrencyBtn.getAttribute('aria-activedescendant'));
-        const itemToSelect = activeItem && activeItem.style.display !== 'none'
-          ? activeItem
-          : getFirstVisibleTargetCurrencyItem();
-        if (itemToSelect) {
-          itemToSelect.click();
-          targetCurrencyBtn.focus();
-        }
-        return;
-      }
-
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-        e.preventDefault();
-        const visibleItems = getVisibleCurrencyItems(targetCurrencyList);
-        focusCurrencyItem(
-          targetCurrencyList,
-          targetCurrencyBtn,
-          e.key === 'ArrowDown' ? visibleItems[0] : visibleItems.at(-1)
-        );
-      }
-    });
-  }
-  
-  document.addEventListener('click', (e) => {
-    if (!targetCurrencyWrapper.contains(e.target)) {
-      closeTargetDropdown();
-    }
-  });
-  
   const currenciesReady = initCurrencies();
 
-  initSiteToggle();
+  populateSiteCurrencySelect();
+  symbolDetails.addEventListener('toggle', () => {
+    if (symbolDetails.open) renderSymbolDefaults();
+  });
+  refreshSiteContext();
+  chrome.tabs.onActivated.addListener(() => refreshSiteContext());
+  chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (tab.active && (changeInfo.url || changeInfo.status === 'complete')) {
+      refreshSiteContext();
+    }
+  });
   // Load saved settings with defaults (Issue 3: Storage initialization)
   chrome.storage.sync.get({ enabled: true }, (result) => {
     enableToggle.checked = result.enabled;
@@ -709,27 +477,51 @@ document.addEventListener('DOMContentLoaded', () => {
   });
  
 
-  if (siteToggle) {
-    siteToggle.addEventListener('change', async () => {
-      if (!currentRootDomain) return;
+  siteToggle.addEventListener('change', () => {
+    const rootDomain = currentRootDomain;
+    const siteKeys = currentSiteKeys;
+    const isEnabled = siteToggle.checked;
+    if (!rootDomain) return;
+    queueSyncWrite(async () => {
       const stored = await chrome.storage.sync.get({ disabledSites: [] });
-      disabledSites = normalizeDisabledSites(stored.disabledSites);
-      if (siteToggle.checked) {
-        disabledSites = disabledSites.filter(site => !currentSiteKeys.includes(site));
-      } else {
-        if (!disabledSites.includes(currentRootDomain)) {
-          disabledSites.push(currentRootDomain);
-        }
+      let disabledSites = normalizeDisabledSites(stored.disabledSites);
+      if (isEnabled) {
+        disabledSites = disabledSites.filter(site => !siteKeys.includes(site));
+      } else if (!disabledSites.includes(rootDomain)) {
+        disabledSites.push(rootDomain);
       }
       await chrome.storage.sync.set({ disabledSites });
     });
-  }
+  });
+
+  siteCurrencySelect.addEventListener('change', () => {
+    const rootDomain = currentRootDomain;
+    const siteKeys = currentSiteKeys;
+    const currency = siteCurrencySelect.value;
+    if (!rootDomain) return;
+    queueSyncWrite(async () => {
+      const stored = await chrome.storage.sync.get({ siteCurrencies: {} });
+      const siteCurrencies = Object.fromEntries(Object.entries(normalizeSiteCurrencies(stored.siteCurrencies))
+        .filter(([site]) => !siteKeys.includes(site)));
+      if (currency) siteCurrencies[rootDomain] = currency;
+      await chrome.storage.sync.set({ siteCurrencies: normalizeSiteCurrencies(siteCurrencies) });
+    });
+  });
+
+  symbolCurrencyList.addEventListener('change', (event) => {
+    const symbol = event.target.dataset?.symbol;
+    if (!symbol) return;
+    const currency = event.target.value;
+    queueSyncWrite(async () => {
+      const stored = await chrome.storage.sync.get({ symbolCurrencies: {} });
+      const symbolCurrencies = normalizeSymbolCurrencies(stored.symbolCurrencies);
+      delete symbolCurrencies[symbol];
+      if (currency) symbolCurrencies[symbol] = currency;
+      await chrome.storage.sync.set({ symbolCurrencies });
+    });
+  });
  
   fromAmount.addEventListener('input', doQuickConvert);
-  fromCurrency.addEventListener('change', () => {
-    persistCurrencySelection({ fromCurrency: fromCurrency.value });
-    doQuickConvert();
-  });
 
   // Preference event listeners
   decimalPlacesSelect.addEventListener('change', () => {
@@ -772,19 +564,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Swap button functionality
   swapBtn.addEventListener('click', () => {
-    const currentFrom = fromCurrency.value;
-    const currentTo = targetCurrency.value;
-    
-    if (currentFrom && currentTo && allCurrencies) {
-      fromCurrency.value = currentTo;
-      targetCurrency.value = currentFrom;
+    const currentFrom = sourcePicker.getValue();
+    const currentTo = targetPicker.getValue();
+
+    if (currentFrom && currentTo && currencyEntries) {
+      sourcePicker.setValue(currentTo);
+      targetPicker.setValue(currentFrom);
       resultCurrency.textContent = currentFrom;
-      
-      const toFlag = getFlag(currentFrom);
-      const toName = allCurrencies[currentFrom.toLowerCase()] || currentFrom;
-      targetCurrencyDisplay.textContent = `${toFlag} ${currentFrom} - ${toName}`;
-      updateSelectedOption(targetCurrencyList, targetCurrencyBtn, currentFrom);
-      
+
       persistCurrencySelection({
         targetCurrency: currentFrom,
         fromCurrency: currentTo
@@ -793,28 +580,47 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  function doQuickConvert() {
-    const amount = parseFloat(fromAmount.value);
-    if (isNaN(amount) || amount <= 0) {
-      convertResult.querySelector('.result-amount').textContent = '--';
+  let conversionRequestId = 0;
+  const resultFormats = new Map();
+
+  function formatResult(value) {
+    let format = resultFormats.get(currentDecimalPlaces);
+    if (!format) {
+      format = new Intl.NumberFormat(undefined, {
+        minimumFractionDigits: currentDecimalPlaces,
+        maximumFractionDigits: currentDecimalPlaces
+      });
+      resultFormats.set(currentDecimalPlaces, format);
+    }
+    return format.format(value);
+  }
+
+  async function doQuickConvert() {
+    const requestId = ++conversionRequestId;
+    const resultAmount = convertResult.querySelector('.result-amount');
+    const amount = Number(fromAmount.value);
+    const fromCurrency = sourcePicker.getValue();
+    const toCurrency = targetPicker.getValue();
+    if (!Number.isFinite(amount) || amount <= 0 || !fromCurrency || !toCurrency) {
+      resultAmount.textContent = '--';
       return;
     }
- 
-    chrome.runtime.sendMessage({
-      type: 'convert',
-      amount: amount,
-      fromCurrency: fromCurrency.value,
-      toCurrency: targetCurrency.value
-    }, (response) => {
-      if (response?.success) {
-        const formatted = response.converted.toLocaleString(undefined, {
-          minimumFractionDigits: currentDecimalPlaces,
-          maximumFractionDigits: currentDecimalPlaces
-        });
-        convertResult.querySelector('.result-amount').textContent = formatted;
-      } else {
-        convertResult.querySelector('.result-amount').textContent = 'Error';
-      }
-    });
+
+    resultAmount.textContent = '--';
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: 'convert',
+        amount,
+        fromCurrency,
+        toCurrency
+      });
+      if (requestId !== conversionRequestId) return;
+      resultAmount.textContent = response?.success && Number.isFinite(response.converted)
+        ? formatResult(response.converted)
+        : 'Error';
+    } catch (error) {
+      if (requestId === conversionRequestId) resultAmount.textContent = 'Error';
+      console.error('Failed to convert amount:', error);
+    }
   }
 });

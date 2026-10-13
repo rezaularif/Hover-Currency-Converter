@@ -39,3 +39,36 @@ test('rejects unknown currency codes and invalid amounts', () => {
   assert.equal(parseCurrency('€1,23,45'), null);
   assert.equal(parseCurrency('not a price'), null);
 });
+
+const parseWithSharedSymbols = globalThis.HCCCurrencyParser.createCurrencyParser({
+  symbolToCurrency: { 'US$': 'USD', 'CN¥': 'CNY', '円': 'JPY', 'zł': 'PLN', '€': 'EUR' },
+  ambiguousSymbols: { '$': '$', '¥': '¥', 'kr.': 'kr', 'kr': 'kr', 'Rs.': 'Rs', 'Rs': 'Rs', '元': '元' },
+  validCurrencyCodes: new Set(['USD', 'CNY', 'JPY', 'PLN', 'EUR'])
+});
+
+const sharedSymbolCases = [
+  ['199 kr.', { symbol: 'kr', amount: 199 }],
+  ['kr. 1.299,00', { symbol: 'kr', amount: 1299 }],
+  ['1 299,00 kr', { symbol: 'kr', amount: 1299 }],
+  ['kr 249', { symbol: 'kr', amount: 249 }],
+  ['Rs. 1,499', { symbol: 'Rs', amount: 1499 }],
+  ['$20', { symbol: '$', amount: 20 }],
+  ['US$20', { currency: 'USD', amount: 20 }],
+  ['CN¥ 99', { currency: 'CNY', amount: 99 }],
+  ['¥1,980', { symbol: '¥', amount: 1980 }],
+  ['1,980円', { currency: 'JPY', amount: 1980 }],
+  ['99元起', { symbol: '元', amount: 99 }],
+  ['49 zł', { currency: 'PLN', amount: 49 }]
+];
+
+for (const [input, expected] of sharedSymbolCases) {
+  test(`parses shared-symbol price ${input}`, () => {
+    assert.deepEqual(parseWithSharedSymbols(input), expected);
+  });
+}
+
+test('letter symbols only match as whole words', () => {
+  assert.equal(parseWithSharedSymbols('5 krabber'), null);
+  assert.equal(parseWithSharedSymbols('Ukraine 2024'), null);
+  assert.equal(parseWithSharedSymbols('Mrs 5'), null);
+});

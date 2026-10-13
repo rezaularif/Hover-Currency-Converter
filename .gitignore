@@ -1,14 +1,41 @@
-# Documentation files (except README.md, PRIVACY_POLICY.md, SUPPORT.md)
+# Documentation files (only the listed docs are published)
 *.md
 !README.md
+!ARCHITECTURE_REVIEW.md
+!STORE_LISTING.md
 !CHANGELOG.md
 !PRIVACY_POLICY.md
 !SUPPORT.md
 !AGENTS.md
-!Claude.md
 
-# Archive files
+# Secrets, credentials, and extension signing keys
+.env
+.env.*
+*.pem
+*.key
+*.crx
+*.p12
+*.pfx
+*.keystore
+credentials*.json
+client_secret*.json
+service-account*.json
+.npmrc
+
+# Store graphics and their sources
+store-assets/
+
+# Release archives and build output
 *.zip
+dist/
+build/
+
+# Local tooling and caches
+node_modules/
+coverage/
+.codegraph/
+.coderabbit/
+*.log
 
 # OS files
 .DS_Store

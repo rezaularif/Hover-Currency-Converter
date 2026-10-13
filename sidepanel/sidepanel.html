@@ -16,16 +16,15 @@
     
     <section class="section">
       <label class="section-label">Target Currency</label>
-      <div class="custom-select-wrapper custom-select-full">
-        <button type="button" id="targetCurrencyBtn" class="custom-select-btn custom-select-btn-full" aria-label="Select target currency" aria-haspopup="listbox" aria-expanded="false" aria-controls="targetCurrencyList">
-          <span id="targetCurrencyDisplay">🇪🇺 EUR - Euro</span>
+      <div class="custom-select-wrapper custom-select-full" id="targetCurrencyPicker">
+        <button type="button" class="custom-select-btn custom-select-btn-full" aria-label="Select target currency" aria-haspopup="listbox" aria-expanded="false" aria-controls="targetCurrencyList">
+          <span class="currency-picker-display">Loading…</span>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
         </button>
-        <div id="targetCurrencyDropdown" class="custom-dropdown custom-dropdown-full hidden">
+        <div class="custom-dropdown custom-dropdown-full hidden">
           <div class="dropdown-search-wrap">
             <input
               type="text"
-              id="targetCurrencySearch"
               class="dropdown-search-input"
               placeholder="Search code or name"
               aria-label="Search target currency"
@@ -38,11 +37,8 @@
             >
           </div>
           <div class="dropdown-list" id="targetCurrencyList" role="listbox" aria-label="Target currency options"></div>
-          <div id="targetCurrencyNoResults" class="dropdown-empty">No currencies found</div>
+          <div class="dropdown-empty">No currencies found</div>
         </div>
-        <select id="targetCurrency" style="display:none;">
-          <option value="">Loading currencies...</option>
-        </select>
       </div>
     </section>
 
@@ -50,9 +46,30 @@
       <label class="section-label">Quick Convert</label>
       <div class="converter-row">
         <input type="number" id="fromAmount" class="amount-input" placeholder="Enter amount" value="100" aria-label="Amount to convert">
-        <select id="fromCurrency" class="source-currency-select" aria-label="Select source currency">
-          <option value="">Loading…</option>
-        </select>
+        <div class="custom-select-wrapper currency-picker-compact" id="sourceCurrencyPicker">
+          <button type="button" class="custom-select-btn" aria-label="Select source currency" aria-haspopup="listbox" aria-expanded="false" aria-controls="sourceCurrencyList">
+            <span class="currency-picker-display">Loading…</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </button>
+          <div class="custom-dropdown custom-dropdown-full hidden">
+            <div class="dropdown-search-wrap">
+              <input
+                type="text"
+                class="dropdown-search-input"
+                placeholder="Search code or name"
+                aria-label="Search source currency"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-controls="sourceCurrencyList"
+                aria-expanded="false"
+                autocomplete="off"
+                spellcheck="false"
+              >
+            </div>
+            <div class="dropdown-list" id="sourceCurrencyList" role="listbox" aria-label="Source currency options"></div>
+            <div class="dropdown-empty">No currencies found</div>
+          </div>
+        </div>
       </div>
       <button class="swap-btn" id="swapBtn" title="Swap currencies" aria-label="Swap source and target currencies">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -63,6 +80,23 @@
         <span class="result-amount">--</span>
         <span class="result-currency" id="resultCurrency">EUR</span>
       </div>
+    </section>
+
+    <section class="section preference-section detection-section">
+      <label class="section-label">Currency Detection</label>
+
+      <div class="preference-row" id="siteCurrencyRow">
+        <span class="preference-label" id="siteCurrencyLabel">Prices on <span id="siteCurrencySite">this site</span></span>
+        <select id="siteCurrency" class="preference-select" aria-labelledby="siteCurrencyLabel">
+          <option value="">Auto-detect</option>
+        </select>
+      </div>
+
+      <details class="symbol-details" id="symbolDetails">
+        <summary class="symbol-summary">Shared symbol defaults</summary></summary>
+        <p class="preference-hint">Some symbols belong to several currencies, like kr in Denmark, Sweden, Norway and Iceland. The currency is detected from the page. These defaults apply only when the page gives no clue.</p>
+        <div id="symbolCurrencyList"></div>
+      </details>
     </section>
 
     <section class="section preference-section">
@@ -163,6 +197,9 @@
         <span class="status-text">Loading rates...</span>
       </div>
       <div class="powered-by">Rates from aggregated financial data sources</div>
+      <a class="bmc-link" href="https://www.buymeacoffee.com/rezaularif" target="_blank" rel="noopener noreferrer">
+        <img src="images/buy-me-a-coffee.png" alt="Buy me a coffee" width="128" height="36">
+      </a>
     </footer>
    </div>
   

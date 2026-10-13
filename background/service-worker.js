@@ -12,15 +12,21 @@ const API_TIMEOUT_MS = 10000;
 const API_BASE = 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1';
 const API_FALLBACK = 'https://latest.currency-api.pages.dev/v1';
 
+const currencyDecimals = new Map();
+
 function getCurrencyDecimals(currencyCode) {
+  if (currencyDecimals.has(currencyCode)) return currencyDecimals.get(currencyCode);
+  let decimals = 2;
   try {
-    return new Intl.NumberFormat(undefined, {
+    decimals = new Intl.NumberFormat(undefined, {
       style: 'currency',
       currency: currencyCode
     }).resolvedOptions().maximumFractionDigits;
   } catch {
-    return 2;
+    decimals = 2;
   }
+  currencyDecimals.set(currencyCode, decimals);
+  return decimals;
 }
 
 // Promise-based lock to prevent concurrent fetches
@@ -45,7 +51,7 @@ async function fetchRates() {
   // Start a new fetch with lock
   fetchInProgress = (async () => {
     try {
-      const stored = await chrome.storage.local.get(['rates', 'lastFetch']);
+      const stored = await chrome.storage.local.get({ rates: null, lastFetch: 0 });
       if (stored.rates && stored.lastFetch && (now - stored.lastFetch) < CACHE_DURATION) {
         ratesCache = stored.rates;
         lastFetch = stored.lastFetch;
@@ -62,7 +68,7 @@ async function fetchRates() {
       if (data && data.usd) {
         const rates = {};
         for (const [code, rate] of Object.entries(data.usd)) {
-          rates[code.toUpperCase()] = rate;
+          if (Number.isFinite(rate) && rate > 0) rates[code.toUpperCase()] = rate;
         }
         rates.USD = 1;
         ratesCache = rates;
@@ -74,8 +80,12 @@ async function fetchRates() {
       return stored.rates || null;
     } catch (error) {
       console.error('Failed to fetch rates:', error.message);
-      const stored = await chrome.storage.local.get(['rates']);
-      return stored.rates || null;
+      try {
+        const stored = await chrome.storage.local.get({ rates: null });
+        return ratesCache || stored.rates;
+      } catch {
+        return ratesCache;
+      }
     } finally {
       fetchInProgress = null;
     }
@@ -85,7 +95,12 @@ async function fetchRates() {
 }
 
 function convertCurrency(amount, fromCurrency, toCurrency, rates) {
-  if (!rates || rates[fromCurrency] === undefined || rates[toCurrency] === undefined) {
+  if (!Number.isFinite(amount) || amount <= 0 ||
+      typeof fromCurrency !== 'string' || !/^[A-Z]{3}$/.test(fromCurrency) ||
+      typeof toCurrency !== 'string' || !/^[A-Z]{3}$/.test(toCurrency) ||
+      !rates || !Object.hasOwn(rates, fromCurrency) || !Object.hasOwn(rates, toCurrency) ||
+      !Number.isFinite(rates[fromCurrency]) || rates[fromCurrency] <= 0 ||
+      !Number.isFinite(rates[toCurrency]) || rates[toCurrency] <= 0) {
     return null;
   }
 
@@ -93,39 +108,26 @@ function convertCurrency(amount, fromCurrency, toCurrency, rates) {
   const converted = amountInUSD * rates[toCurrency];
   const decimals = getCurrencyDecimals(toCurrency);
 
-  return { converted, decimals };
+  return Number.isFinite(converted) ? { converted, decimals } : null;
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === 'convert') {
-    const { amount, fromCurrency, toCurrency } = message;
+  if (message?.type !== 'convert' && message?.type !== 'getRates') return;
 
-    fetchRates().then(rates => {
-      if (rates) {
-        const result = convertCurrency(amount, fromCurrency, toCurrency, rates);
-        if (result) {
-          sendResponse({
-            success: true,
-            converted: result.converted,
-            decimals: result.decimals
-          });
-        } else {
-          sendResponse({ success: false, error: 'Invalid currency' });
-        }
-      } else {
-        sendResponse({ success: false, error: 'No rates available' });
-      }
-    });
-
-    return true;
-  }
-
-  if (message.type === 'getRates') {
-    fetchRates().then(rates => {
+  fetchRates().then(rates => {
+    if (message.type === 'getRates') {
       sendResponse({ success: !!rates });
-    });
-    return true;
-  }
+      return;
+    }
+    const result = convertCurrency(message.amount, message.fromCurrency, message.toCurrency, rates);
+    sendResponse(result
+      ? { success: true, ...result }
+      : { success: false, error: rates ? 'Invalid conversion' : 'No rates available' });
+  }).catch(error => {
+    console.error('Failed to handle conversion request:', error);
+    sendResponse({ success: false, error: 'Conversion unavailable' });
+  });
+  return true;
 });
 
 // Inject content script if needed and open side panel when extension icon is clicked
@@ -147,15 +149,16 @@ chrome.action.onClicked.addListener(async (tab) => {
     }
 
     if (!isContentReady) {
+      const [contentScript] = chrome.runtime.getManifest().content_scripts;
       try {
         await chrome.scripting.executeScript({
           target: { tabId: tab.id },
-          files: ['lib/settings-core.js', 'lib/currency-parser.js', 'content/content.js']
+          files: contentScript.js
         });
 
         await chrome.scripting.insertCSS({
           target: { tabId: tab.id },
-          files: ['content/content.css']
+          files: contentScript.css
         });
       } catch (error) {
         console.log('Could not inject script:', error);
@@ -176,7 +179,9 @@ chrome.runtime.onInstalled.addListener(async (details) => {
           targetCurrency: null,
           fromCurrency: null,
           enabled: null,
-          disabledSites: null
+          disabledSites: null,
+          symbolCurrencies: null,
+          siteCurrencies: null
         }),
         chrome.storage.local.get({
           decimalPlaces: null,

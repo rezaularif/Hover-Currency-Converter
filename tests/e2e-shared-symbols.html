@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="da-DK">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hover Currency Converter Shared Symbol Test</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 40px; color: #172033; }
+    main { display: grid; grid-template-columns: repeat(2, minmax(260px, 1fr)); gap: 20px; }
+    article { padding: 24px; border: 1px solid #cbd5e1; border-radius: 12px; background: white; font-size: 18px; }
+    strong { display: block; margin-top: 12px; font-size: 24px; }
+  </style>
+</head>
+<body>
+  <h1>Shared symbol test (Danish page)</h1>
+  <p>Expected with target DKK: no tooltip for the first two. With another target: converts from DKK unless noted.</p>
+  <main>
+    <article>Danish suffix<strong id="dkk-suffix">1.299,00 kr.</strong></article>
+    <article>Danish prefix<strong id="dkk-prefix">kr. 249</strong></article>
+    <article>Element hint overrides page (NOK)<strong id="nok-hint" data-currency="NOK">kr 249</strong></article>
+    <article>Dollar on a Danish page (USD)<strong id="usd">$20</strong></article>
+    <article>Yen without clues (JPY or your currency)<strong id="yen">¥980</strong></article>
+    <article>Not a price<strong id="not-price">5 krabber</strong></article>
+  </main>
+</body>
+</html>

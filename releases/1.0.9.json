@@ -1,0 +1,15 @@
+{
+  "extensionId": "plbdgcecigogedfihfmabohdbbbokfka",
+  "version": "1.0.9",
+  "submittedDate": "2026-09-07",
+  "statusAtSubmission": "Pending review",
+  "automaticPublicationAfterApproval": true,
+  "package": "Hover-Currency-Converter-v1.0.9.zip",
+  "sha256": "b035bf89cdc10593276be8364298b1a62832b2475ac6f3a93430c183fc20c8d1",
+  "packageBytes": 107290,
+  "runtimeFiles": 20,
+  "automatedTestsPassed": 39,
+  "listingCopy": "STORE_LISTING.md",
+  "submissionEvidence": "Chrome Web Store confirmation: Your extension was submitted for review; item header: Pending review.",
+  "notes": "Submitted using the existing Google Chrome instance through Computer Use. Existing permissions and distribution were unchanged. Reviewer text was corrected to describe Chrome sync and automatic content scripts accurately."
+}
