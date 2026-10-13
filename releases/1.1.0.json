@@ -1,0 +1,15 @@
+{
+  "extensionId": "plbdgcecigogedfihfmabohdbbbokfka",
+  "version": "1.1.0",
+  "submittedDate": "2026-10-14",
+  "statusAtSubmission": "Pending review",
+  "automaticPublicationAfterApproval": true,
+  "package": "Hover-Currency-Converter-v1.1.0.zip",
+  "sha256": "243b76f06e76e7b8cce86ea83e67b7f253b570f7ef35643c23faf8fd8fd92d35",
+  "packageBytes": 89933,
+  "runtimeFiles": 25,
+  "automatedTestsPassed": 130,
+  "listingCopy": "STORE_LISTING.md",
+  "submissionEvidence": "Chrome Web Store Developer Dashboard: maintainer updated the store listing (1.1.0 description, three new screenshots, small promo tile, marquee promo tile, transparent store icon) and submitted the v1.1.0 package for review on 2026-10-14.",
+  "notes": "Submitted manually by the maintainer. New logo adopted across extension icons, welcome page, README banner, and regenerated store artwork (Nucleo two-tone icons in the feature pills; transparent store icon). Tests: 100 unit (node --test), 18 e2e (Playwright), 12 currency-picker UI checks. The original archive was unpacked during upload; the attached zip was rebuilt from the repo tree and verified byte-identical (cmp) against the unpacked package."
+}

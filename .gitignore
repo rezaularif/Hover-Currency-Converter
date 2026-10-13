@@ -27,6 +27,7 @@ store-assets/
 
 # Release archives and build output
 *.zip
+Hover-Currency-Converter-v*/
 dist/
 build/
 
