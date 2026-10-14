@@ -270,6 +270,32 @@ test('loaded currencies populate both pickers and swap exchanges them', async ()
   assert.deepEqual(app.lastWrite(), { targetCurrency: 'USD', fromCurrency: 'DKK' });
 });
 
+test('invalid saved currency lists are refetched or rejected instead of used', async () => {
+  for (const savedList of [{}, [], { btc: 'Bitcoin' }]) {
+    const urls = [];
+    const app = setup({
+      local: { currenciesList: savedList, currenciesListFetchedAt: Date.now() },
+      fetchImpl: async url => {
+        urls.push(url);
+        return { usd: 'US Dollar', eur: 'Euro' };
+      }
+    });
+    await flush();
+    await flush();
+    assert.equal(urls.length, 1, JSON.stringify(savedList));
+    assert.deepEqual(JSON.parse(JSON.stringify(app.pickers.target.entries.list.map(entry => entry.code))), ['USD', 'EUR']);
+
+    const offline = setup({
+      local: { currenciesList: savedList, currenciesListFetchedAt: 0 },
+      fetchImpl: async () => { throw new Error('Offline'); }
+    });
+    await flush();
+    await flush();
+    assert.equal(offline.pickers.target.unavailable, true, JSON.stringify(savedList));
+    assert.equal(offline.pickers.target.entries, null);
+  }
+});
+
 test('currency list fetch falls back to pages.dev when primary CDN fails or returns invalid data', async () => {
   for (const failure of ['throw', null, [], {}]) {
     const urls = [];

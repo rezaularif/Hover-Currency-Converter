@@ -76,7 +76,7 @@ async function fetchCurrencies() {
   try {
     cached = await chrome.storage.local.get(cached);
     if (
-      cached.currenciesList &&
+      isValidCurrenciesResponse(cached.currenciesList) &&
       cached.currenciesListFetchedAt &&
       (now - cached.currenciesListFetchedAt) < CURRENCIES_CACHE_DURATION
     ) {
@@ -97,7 +97,7 @@ async function fetchCurrencies() {
     return data;
   } catch (error) {
     console.error('Failed to fetch currencies:', error);
-    return cached.currenciesList || null;
+    return isValidCurrenciesResponse(cached.currenciesList) ? cached.currenciesList : null;
   }
 }
 
