@@ -44,11 +44,27 @@ const NON_FIAT_NAME_PATTERNS = [
 ];
 
 const CURRENCIES_API_URL = 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies.json';
+const CURRENCIES_API_FALLBACK_URL = 'https://latest.currency-api.pages.dev/v1/currencies.json';
 const CURRENCIES_CACHE_DURATION = 24 * 60 * 60 * 1000;
 const CURRENCIES_API_TIMEOUT_MS = 10000;
 const DEFAULT_TARGET_CURRENCY = DEFAULT_SYNC_SETTINGS.targetCurrency;
 const DEFAULT_FROM_CURRENCY = DEFAULT_SYNC_SETTINGS.fromCurrency;
 const DEFAULT_RESULT_GRADIENT = DEFAULT_LOCAL_SETTINGS.resultGradient;
+
+function isValidCurrenciesResponse(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return false;
+  return Object.entries(data).some(([code, name]) => isFiatCurrencyEntry(code, name));
+}
+
+async function fetchCurrenciesFromUrl(url) {
+  const data = await fetchJsonWithRetry(url, {
+    timeoutMs: CURRENCIES_API_TIMEOUT_MS
+  });
+  if (!isValidCurrenciesResponse(data)) {
+    throw new Error('Invalid currencies API response');
+  }
+  return data;
+}
 
 async function fetchCurrencies() {
   const now = Date.now();
@@ -60,18 +76,18 @@ async function fetchCurrencies() {
   try {
     cached = await chrome.storage.local.get(cached);
     if (
-      cached.currenciesList &&
+      isValidCurrenciesResponse(cached.currenciesList) &&
       cached.currenciesListFetchedAt &&
       (now - cached.currenciesListFetchedAt) < CURRENCIES_CACHE_DURATION
     ) {
       return cached.currenciesList;
     }
 
-    const data = await fetchJsonWithRetry(CURRENCIES_API_URL, {
-      timeoutMs: CURRENCIES_API_TIMEOUT_MS
-    });
-    if (!data || typeof data !== 'object') {
-      throw new Error('Invalid currencies API response');
+    let data;
+    try {
+      data = await fetchCurrenciesFromUrl(CURRENCIES_API_URL);
+    } catch {
+      data = await fetchCurrenciesFromUrl(CURRENCIES_API_FALLBACK_URL);
     }
 
     await chrome.storage.local.set({
@@ -81,7 +97,7 @@ async function fetchCurrencies() {
     return data;
   } catch (error) {
     console.error('Failed to fetch currencies:', error);
-    return cached.currenciesList || null;
+    return isValidCurrenciesResponse(cached.currenciesList) ? cached.currenciesList : null;
   }
 }
 
@@ -444,12 +460,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Rates status
-    if (result.lastFetch) {
-      const lastUpdate = new Date(result.lastFetch);
-      const now = new Date();
-      const diffMinutes = Math.floor((now - lastUpdate) / 60000);
-
+    function setRateStatus(timestamp) {
+      statusDot.classList.remove('error');
       statusDot.classList.add('success');
+      if (!timestamp) {
+        statusText.textContent = 'Rates loaded successfully';
+        return;
+      }
+      const diffMinutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60000));
       if (diffMinutes < 1) {
         statusText.textContent = 'Rates updated just now';
       } else if (diffMinutes < 60) {
@@ -458,12 +476,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const diffHours = Math.floor(diffMinutes / 60);
         statusText.textContent = `Rates updated ${diffHours}h ago`;
       }
+    }
+
+    const diffMinutes = result.lastFetch ? Math.floor((Date.now() - result.lastFetch) / 60000) : Infinity;
+    if (diffMinutes < 60) {
+      setRateStatus(result.lastFetch);
     } else {
       chrome.runtime.sendMessage({ type: 'getRates' }, (response) => {
         if (response?.success) {
-          statusDot.classList.add('success');
-          statusText.textContent = 'Rates loaded successfully';
+          setRateStatus(response.lastFetch || result.lastFetch);
+        } else if (result.lastFetch) {
+          setRateStatus(result.lastFetch);
         } else {
+          statusDot.classList.remove('success');
           statusDot.classList.add('error');
           statusText.textContent = 'Failed to load rates';
         }

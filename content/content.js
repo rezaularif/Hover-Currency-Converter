@@ -46,6 +46,7 @@
   const MOUSE_MOVE_INTERVAL_MS = 16;
   const HIDE_DELAY_MS = 100;
   const PASSIVE_CAPTURE = { capture: true, passive: true };
+  const WORD_BOUNDARY_PAIR = /[A-Za-z\u00C0-\u024F\d][A-Za-z\u00C0-\u024F\d]/;
   const SKIPPED_TEXT_TAGS = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE']);
 
   const numberFormats = new Map();
@@ -152,8 +153,7 @@
     }
     let current = element;
     for (let depth = 0; current && current !== document.body && depth < MAX_TEXT_DEPTH; depth++) {
-      const text = getBoundedText(current, MAX_TEXT_LENGTH);
-      if (text) {
+      for (const text of getBoundedTexts(current, MAX_TEXT_LENGTH)) {
         const parsed = parseCurrency(text);
         if (parsed) return resolveParsedCurrency(parsed, element);
       }
@@ -183,24 +183,37 @@
     return pageCurrencyCache.currencies;
   }
 
-  function getBoundedText(element, limit) {
-    let text = '';
+  function getBoundedTexts(element, limit) {
+    let joined = '';
+    let spaced = '';
     let node = element.firstChild;
     while (node) {
       if (node.nodeType === Node.TEXT_NODE) {
-        text += node.textContent;
-        if (text.length > limit && text.trim().length > limit) return null;
+        const chunk = node.textContent;
+        if (chunk) {
+          if (spaced && WORD_BOUNDARY_PAIR.test(`${spaced.at(-1)}${chunk[0]}`)) spaced += ' ';
+          joined += chunk;
+          spaced += chunk;
+          if (joined.length > limit && joined.trim().length > limit) return [];
+        }
       } else if (node.firstChild && !SKIPPED_TEXT_TAGS.has(node.tagName)) {
         node = node.firstChild;
         continue;
       }
       while (!node.nextSibling) {
         node = node.parentNode;
-        if (!node || node === element) return text.trim();
+        if (!node || node === element) {
+          const trimmedJoined = joined.trim();
+          if (!trimmedJoined) return [];
+          const trimmedSpaced = spaced.trim();
+          return trimmedSpaced !== trimmedJoined && trimmedSpaced.length <= limit
+            ? [trimmedJoined, trimmedSpaced]
+            : [trimmedJoined];
+        }
       }
       node = node.nextSibling;
     }
-    return text.trim();
+    return [];
   }
 
   function getDirectTextContent(element) {

@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 async function setup({ rates = { USD: 1, EUR: 0.9, JPY: 150 }, lastFetch = Date.now(), storageError = false, fetchImpl } = {}) {
   let listener;
   let fetchCalls = 0;
+  const writes = [];
   globalThis.chrome = {
     storage: {
       local: {
@@ -11,7 +12,7 @@ async function setup({ rates = { USD: 1, EUR: 0.9, JPY: 150 }, lastFetch = Date.
           if (storageError) throw new Error('Storage unavailable');
           return { ...defaults, rates, lastFetch };
         },
-        set: async () => {}
+        set: async values => { writes.push(values); }
       }
     },
     runtime: {
@@ -24,6 +25,7 @@ async function setup({ rates = { USD: 1, EUR: 0.9, JPY: 150 }, lastFetch = Date.
   await import(`../background/service-worker.js?test=${Math.random()}`);
   return {
     listener,
+    writes,
     calls: () => fetchCalls,
     send: message => new Promise(resolve => listener(message, {}, resolve))
   };
@@ -88,9 +90,36 @@ test('worker conversion boundary, caching, and error responses', async t => {
     assert.match(urls[3], /currency-api.pages.dev/);
   });
 
-  await t.test('offline refresh preserves usable stale rates', async () => {
-    const app = await setup({ lastFetch: 0, fetchImpl: async () => { throw new Error('Offline'); } });
-    assert.equal((await app.send(conversion)).converted, 9);
+  await t.test('unusable primary rates fall through to the fallback API', async () => {
+    const urls = [];
+    const app = await setup({ lastFetch: 0, fetchImpl: async url => {
+      urls.push(url);
+      if (url.includes('jsdelivr')) return { ok: true, json: async () => ({ usd: {} }) };
+      return { ok: true, json: async () => ({ usd: { usd: 1, eur: 0.95 } }) };
+    } });
+    assert.equal((await app.send(conversion)).converted, 9.5);
+    assert.equal(urls.length, 2);
+    assert.match(urls[1], /currency-api.pages.dev/);
+  });
+
+  await t.test('unusable rates from both APIs keep the stale cache without overwriting it', async () => {
+    const staleTime = 1700000000000;
+    for (const body of [{ usd: {} }, { usd: { eur: 0, jpy: 'x', bad: -1 } }, { usd: [] }, {}]) {
+      const app = await setup({ lastFetch: staleTime, fetchImpl: async () => ({ ok: true, json: async () => body }) });
+      const [conv, status] = await Promise.all([app.send(conversion), app.send({ type: 'getRates' })]);
+      assert.equal(conv.converted, 9, JSON.stringify(body));
+      assert.deepEqual(status, { success: true, lastFetch: staleTime });
+      assert.equal(app.calls(), 2);
+      assert.deepEqual(app.writes, []);
+    }
+  });
+
+  await t.test('offline refresh preserves usable stale rates and lastFetch', async () => {
+    const staleTime = 1700000000000;
+    const app = await setup({ lastFetch: staleTime, fetchImpl: async () => { throw new Error('Offline'); } });
+    const [conv, status] = await Promise.all([app.send(conversion), app.send({ type: 'getRates' })]);
+    assert.equal(conv.converted, 9);
+    assert.deepEqual(status, { success: true, lastFetch: staleTime });
     assert.equal(app.calls(), 6);
   });
 

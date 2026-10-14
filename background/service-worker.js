@@ -35,6 +35,23 @@ let fetchInProgress = null;
 let ratesCache = null;
 let lastFetch = 0;
 
+function parseRates(data) {
+  const usdRates = data?.usd;
+  if (!usdRates || typeof usdRates !== 'object' || Array.isArray(usdRates)) return null;
+  const rates = {};
+  for (const [code, rate] of Object.entries(usdRates)) {
+    if (Number.isFinite(rate) && rate > 0) rates[code.toUpperCase()] = rate;
+  }
+  rates.USD = 1;
+  return Object.keys(rates).some(code => code !== 'USD') ? rates : null;
+}
+
+async function fetchRatesFrom(base) {
+  const rates = parseRates(await fetchJsonWithRetry(`${base}/currencies/usd.json`, { timeoutMs: API_TIMEOUT_MS }));
+  if (!rates) throw new Error('Invalid rates API response');
+  return rates;
+}
+
 async function fetchRates() {
   const now = Date.now();
 
@@ -58,31 +75,26 @@ async function fetchRates() {
         return ratesCache;
       }
 
-      let data;
+      let rates;
       try {
-        data = await fetchJsonWithRetry(`${API_BASE}/currencies/usd.json`, { timeoutMs: API_TIMEOUT_MS });
-      } catch (e) {
-        data = await fetchJsonWithRetry(`${API_FALLBACK}/currencies/usd.json`, { timeoutMs: API_TIMEOUT_MS });
+        rates = await fetchRatesFrom(API_BASE);
+      } catch {
+        rates = await fetchRatesFrom(API_FALLBACK);
       }
 
-      if (data && data.usd) {
-        const rates = {};
-        for (const [code, rate] of Object.entries(data.usd)) {
-          if (Number.isFinite(rate) && rate > 0) rates[code.toUpperCase()] = rate;
-        }
-        rates.USD = 1;
-        ratesCache = rates;
-        lastFetch = Date.now();
-        await chrome.storage.local.set({ rates: ratesCache, lastFetch });
-        return ratesCache;
-      }
-
-      return stored.rates || null;
+      ratesCache = rates;
+      lastFetch = Date.now();
+      await chrome.storage.local.set({ rates: ratesCache, lastFetch });
+      return ratesCache;
     } catch (error) {
       console.error('Failed to fetch rates:', error.message);
       try {
-        const stored = await chrome.storage.local.get({ rates: null });
-        return ratesCache || stored.rates;
+        const stored = await chrome.storage.local.get({ rates: null, lastFetch: 0 });
+        if (stored.rates && !ratesCache) {
+          ratesCache = stored.rates;
+          lastFetch = stored.lastFetch || 0;
+        }
+        return ratesCache || stored.rates || null;
       } catch {
         return ratesCache;
       }
@@ -116,7 +128,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   fetchRates().then(rates => {
     if (message.type === 'getRates') {
-      sendResponse({ success: !!rates });
+      sendResponse({ success: !!rates, lastFetch: lastFetch || null });
       return;
     }
     const result = convertCurrency(message.amount, message.fromCurrency, message.toCurrency, rates);
