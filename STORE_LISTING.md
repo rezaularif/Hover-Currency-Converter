@@ -36,7 +36,7 @@ An internet connection is needed to download fresh rates. Cached rates may remai
 
 Detection depends on how a website displays its prices. Some formats and restricted Chrome pages are not supported. If a shared symbol is matched to the wrong currency on a site, set that site's currency in the side panel under Currency Detection.
 
-What’s new in 1.1.0
+What’s new in 1.1.1
 • Shared currency symbols (kr, $, £, ¥, Rs, ﷼, 元, C$, B$) are now detected from the page instead of always being treated as one currency. For example, Danish prices in kr are no longer read as Swedish kronor.
 • New Currency Detection settings: choose the currency a site uses, or a default for each shared symbol.
 • The Quick Convert currency is now searchable, just like Target Currency.

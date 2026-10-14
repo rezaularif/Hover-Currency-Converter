@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.1.1] - 2026-10-15
+
+### Fixed
+- Preserved split-element prices when currency symbols and amounts are separated across child nodes (e.g., `<span>$</span><span>19</span><span>99</span>`).
+- Rejected malformed or unusable exchange-rate and currency-list payloads before caching, falling back cleanly to the secondary CDN or cached data.
+- Preserved the cached rate timestamp in the side panel when a background refresh falls back to stale cache.
+
 ## [1.1.0] - 2026-10-14
 
 Highlights: shared currency symbols such as `kr`, `$` and `¥` are now detected correctly, you can tell the extension which currency a site uses, the Quick Convert currency is searchable, and hovering is much lighter on busy pages.

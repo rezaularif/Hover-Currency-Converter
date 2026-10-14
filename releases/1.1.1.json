@@ -1,0 +1,15 @@
+{
+  "extensionId": "plbdgcecigogedfihfmabohdbbbokfka",
+  "version": "1.1.1",
+  "submittedDate": "2026-10-15",
+  "statusAtSubmission": "Pending review",
+  "automaticPublicationAfterApproval": true,
+  "package": "Hover-Currency-Converter-v1.1.1.zip",
+  "sha256": "98c6608b5a823f2a39ccf3e506ed7f85a9b02f052e6cdc9d38799bbb8229ab67",
+  "packageBytes": 90586,
+  "runtimeFiles": 25,
+  "automatedTestsPassed": 136,
+  "listingCopy": "STORE_LISTING.md",
+  "submissionEvidence": "Built for Chrome Web Store upload after PR #3 merge since v1.1.0 was already uploaded.",
+  "notes": "Includes PR #3 fixes: split-element currency symbol/amount preservation, strict payload validation for exchange rates and currency lists before caching, and stale rate timestamp preservation in the side panel."
+}
