@@ -224,6 +224,14 @@ test('only short ancestor text is searched for split prices', async () => {
   app.event('mouseover', splitPrefixSymbol.childNodes[2]);
   assert.equal(app.requests[3].message.fromCurrency, 'BRL');
   assert.equal(app.requests[3].message.amount, 19.99);
+
+  const internallySplitCode = app.element('USD 25', {}, [
+    app.element('US'),
+    app.element('D 25')
+  ]);
+  app.event('mouseover', internallySplitCode.childNodes[1]);
+  assert.equal(app.requests[4].message.fromCurrency, 'USD');
+  assert.equal(app.requests[4].message.amount, 25);
 });
 
 test('Danish prices are not converted for a Danish user on a Danish site', async () => {

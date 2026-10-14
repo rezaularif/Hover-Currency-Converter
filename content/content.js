@@ -153,8 +153,7 @@
     }
     let current = element;
     for (let depth = 0; current && current !== document.body && depth < MAX_TEXT_DEPTH; depth++) {
-      const text = getBoundedText(current, MAX_TEXT_LENGTH);
-      if (text) {
+      for (const text of getBoundedTexts(current, MAX_TEXT_LENGTH)) {
         const parsed = parseCurrency(text);
         if (parsed) return resolveParsedCurrency(parsed, element);
       }
@@ -184,16 +183,18 @@
     return pageCurrencyCache.currencies;
   }
 
-  function getBoundedText(element, limit) {
-    let text = '';
+  function getBoundedTexts(element, limit) {
+    let joined = '';
+    let spaced = '';
     let node = element.firstChild;
     while (node) {
       if (node.nodeType === Node.TEXT_NODE) {
         const chunk = node.textContent;
         if (chunk) {
-          if (text && WORD_BOUNDARY_PAIR.test(`${text.at(-1)}${chunk[0]}`)) text += ' ';
-          text += chunk;
-          if (text.length > limit && text.trim().length > limit) return null;
+          if (spaced && WORD_BOUNDARY_PAIR.test(`${spaced.at(-1)}${chunk[0]}`)) spaced += ' ';
+          joined += chunk;
+          spaced += chunk;
+          if (joined.length > limit && joined.trim().length > limit) return [];
         }
       } else if (node.firstChild && !SKIPPED_TEXT_TAGS.has(node.tagName)) {
         node = node.firstChild;
@@ -201,11 +202,16 @@
       }
       while (!node.nextSibling) {
         node = node.parentNode;
-        if (!node || node === element) return text.trim();
+        if (!node || node === element) {
+          const trimmedJoined = joined.trim();
+          const trimmedSpaced = spaced.trim();
+          if (!trimmedJoined) return [];
+          return trimmedSpaced !== trimmedJoined ? [trimmedJoined, trimmedSpaced] : [trimmedJoined];
+        }
       }
       node = node.nextSibling;
     }
-    return text.trim();
+    return [];
   }
 
   function getDirectTextContent(element) {

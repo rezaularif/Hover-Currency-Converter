@@ -270,21 +270,26 @@ test('loaded currencies populate both pickers and swap exchanges them', async ()
   assert.deepEqual(app.lastWrite(), { targetCurrency: 'USD', fromCurrency: 'DKK' });
 });
 
-test('currency list fetch falls back to pages.dev when primary CDN fails', async () => {
-  const urls = [];
-  const app = setup({
-    local: { currenciesList: null, currenciesListFetchedAt: 0 },
-    fetchImpl: async url => {
-      urls.push(url);
-      if (url.includes('jsdelivr')) throw new Error('CDN blocked');
-      return { usd: 'US Dollar', eur: 'Euro' };
-    }
-  });
-  await flush();
-  await flush();
-  assert.equal(urls.length, 2);
-  assert.match(urls[1], /currency-api\.pages\.dev/);
-  assert.deepEqual(JSON.parse(JSON.stringify(app.pickers.target.entries.list.map(entry => entry.code))), ['USD', 'EUR']);
+test('currency list fetch falls back to pages.dev when primary CDN fails or returns invalid data', async () => {
+  for (const failure of ['throw', null, []]) {
+    const urls = [];
+    const app = setup({
+      local: { currenciesList: null, currenciesListFetchedAt: 0 },
+      fetchImpl: async url => {
+        urls.push(url);
+        if (url.includes('jsdelivr')) {
+          if (failure === 'throw') throw new Error('CDN blocked');
+          return failure;
+        }
+        return { usd: 'US Dollar', eur: 'Euro' };
+      }
+    });
+    await flush();
+    await flush();
+    assert.equal(urls.length, 2);
+    assert.match(urls[1], /currency-api\.pages\.dev/);
+    assert.deepEqual(JSON.parse(JSON.stringify(app.pickers.target.entries.list.map(entry => entry.code))), ['USD', 'EUR']);
+  }
 });
 
 test('stale cached rates trigger a background getRates refresh on panel open and preserve age when refresh falls back to stale cache', async () => {

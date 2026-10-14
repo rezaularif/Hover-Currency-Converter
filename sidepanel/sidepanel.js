@@ -51,6 +51,20 @@ const DEFAULT_TARGET_CURRENCY = DEFAULT_SYNC_SETTINGS.targetCurrency;
 const DEFAULT_FROM_CURRENCY = DEFAULT_SYNC_SETTINGS.fromCurrency;
 const DEFAULT_RESULT_GRADIENT = DEFAULT_LOCAL_SETTINGS.resultGradient;
 
+function isValidCurrenciesResponse(data) {
+  return Boolean(data && typeof data === 'object' && !Array.isArray(data));
+}
+
+async function fetchCurrenciesFromUrl(url) {
+  const data = await fetchJsonWithRetry(url, {
+    timeoutMs: CURRENCIES_API_TIMEOUT_MS
+  });
+  if (!isValidCurrenciesResponse(data)) {
+    throw new Error('Invalid currencies API response');
+  }
+  return data;
+}
+
 async function fetchCurrencies() {
   const now = Date.now();
   let cached = {
@@ -70,16 +84,9 @@ async function fetchCurrencies() {
 
     let data;
     try {
-      data = await fetchJsonWithRetry(CURRENCIES_API_URL, {
-        timeoutMs: CURRENCIES_API_TIMEOUT_MS
-      });
+      data = await fetchCurrenciesFromUrl(CURRENCIES_API_URL);
     } catch {
-      data = await fetchJsonWithRetry(CURRENCIES_API_FALLBACK_URL, {
-        timeoutMs: CURRENCIES_API_TIMEOUT_MS
-      });
-    }
-    if (!data || typeof data !== 'object') {
-      throw new Error('Invalid currencies API response');
+      data = await fetchCurrenciesFromUrl(CURRENCIES_API_FALLBACK_URL);
     }
 
     await chrome.storage.local.set({

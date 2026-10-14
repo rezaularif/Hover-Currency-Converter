@@ -61,6 +61,7 @@ async function fetchRates() {
       let data;
       try {
         data = await fetchJsonWithRetry(`${API_BASE}/currencies/usd.json`, { timeoutMs: API_TIMEOUT_MS });
+        if (!data?.usd || typeof data.usd !== 'object') throw new Error('Invalid rates API response');
       } catch (e) {
         data = await fetchJsonWithRetry(`${API_FALLBACK}/currencies/usd.json`, { timeoutMs: API_TIMEOUT_MS });
       }
