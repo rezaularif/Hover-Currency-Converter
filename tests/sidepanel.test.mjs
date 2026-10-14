@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import * as settings from '../lib/settings.js';
+import { RESULT_GRADIENT_STYLES } from '../lib/result-gradients.js';
 import '../lib/currencies.js';
 import '../lib/currency-detection.js';
 
@@ -12,7 +13,7 @@ const source = (await readFile(new URL('../sidepanel/sidepanel.js', import.meta.
 function createElement() {
   const classes = new Set();
   return {
-    value: '', textContent: '', style: {}, dataset: {}, children: [], listeners: new Map(),
+    value: '', textContent: '', style: { setProperty() {} }, dataset: {}, children: [], listeners: new Map(),
     classList: {
       add: name => classes.add(name),
       remove: name => classes.delete(name),
@@ -41,7 +42,7 @@ function createFakePicker(options) {
   };
 }
 
-function setup({ tabs = [], sync = {}, local = null } = {}) {
+function setup({ tabs = [], sync = {}, local = null, fetchImpl = null } = {}) {
   const pickers = {};
   const elements = new Map();
   const requests = [];
@@ -54,10 +55,10 @@ function setup({ tabs = [], sync = {}, local = null } = {}) {
     return elements.get(id);
   };
   const context = vm.createContext({
-    ...settings, console, URL, Intl,
+    ...settings, RESULT_GRADIENT_STYLES, console, URL, Intl, Date,
     HCCCurrencies: globalThis.HCCCurrencies,
     HCCCurrencyDetection: globalThis.HCCCurrencyDetection,
-    fetchJsonWithRetry: () => new Promise(() => {}),
+    fetchJsonWithRetry: fetchImpl || (() => new Promise(() => {})),
     createCurrencyPicker: (root, options) => {
       pickers[options.compact ? 'source' : 'target'] = createFakePicker(options);
       return pickers[options.compact ? 'source' : 'target'];
@@ -77,7 +78,12 @@ function setup({ tabs = [], sync = {}, local = null } = {}) {
       },
       storage: {
         local: {
-          get: (defaults, callback) => (callback || !local ? new Promise(() => {}) : Promise.resolve({ ...defaults, ...local })),
+          get: (defaults, callback) => {
+            if (!local) return new Promise(() => {});
+            const values = { ...defaults, ...local };
+            if (callback) return callback(values);
+            return Promise.resolve(values);
+          },
           set: () => Promise.resolve()
         },
         sync: {
@@ -94,7 +100,16 @@ function setup({ tabs = [], sync = {}, local = null } = {}) {
         }
       },
       runtime: {
-        sendMessage: message => new Promise((resolve, reject) => requests.push({ message, resolve, reject }))
+        sendMessage: (message, callback) => new Promise((resolve, reject) => {
+          requests.push({
+            message,
+            resolve: value => {
+              if (callback) callback(value);
+              resolve(value);
+            },
+            reject
+          });
+        })
       }
     }
   });
@@ -253,4 +268,38 @@ test('loaded currencies populate both pickers and swap exchanges them', async ()
   assert.equal(app.pickers.target.getValue(), 'USD');
   assert.equal(app.pickers.source.getValue(), 'DKK');
   assert.deepEqual(app.lastWrite(), { targetCurrency: 'USD', fromCurrency: 'DKK' });
+});
+
+test('currency list fetch falls back to pages.dev when primary CDN fails', async () => {
+  const urls = [];
+  const app = setup({
+    local: { currenciesList: null, currenciesListFetchedAt: 0 },
+    fetchImpl: async url => {
+      urls.push(url);
+      if (url.includes('jsdelivr')) throw new Error('CDN blocked');
+      return { usd: 'US Dollar', eur: 'Euro' };
+    }
+  });
+  await flush();
+  await flush();
+  assert.equal(urls.length, 2);
+  assert.match(urls[1], /currency-api\.pages\.dev/);
+  assert.deepEqual(JSON.parse(JSON.stringify(app.pickers.target.entries.list.map(entry => entry.code))), ['USD', 'EUR']);
+});
+
+test('stale cached rates trigger a background getRates refresh on panel open', async () => {
+  const app = setup({
+    local: {
+      currenciesList: { usd: 'US Dollar', eur: 'Euro' },
+      currenciesListFetchedAt: Date.now(),
+      lastFetch: Date.now() - 2 * 60 * 60 * 1000
+    }
+  });
+  await flush();
+  await flush();
+  const rateReq = app.requests.find(r => r.message.type === 'getRates');
+  assert.ok(rateReq);
+  rateReq.resolve({ success: true });
+  assert.equal(app.getElement('.status-text').textContent, 'Rates loaded successfully');
+  assert.equal(app.getElement('.status-dot').classList.contains('success'), true);
 });

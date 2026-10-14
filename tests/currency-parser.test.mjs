@@ -37,7 +37,16 @@ test('rejects unknown currency codes and invalid amounts', () => {
   assert.equal(parseCurrency('ABC 10.00'), null);
   assert.equal(parseCurrency('€0'), null);
   assert.equal(parseCurrency('€1,23,45'), null);
+  assert.equal(parseCurrency('€1.23,45.67'), null);
+  assert.equal(parseCurrency('$1,23.45'), null);
   assert.equal(parseCurrency('not a price'), null);
+});
+
+test('skips invalid leading matches to find a valid price later in the text', () => {
+  assert.deepEqual(parseCurrency('Code: ABC 100 | Price: USD 50'), { currency: 'USD', amount: 50 });
+  assert.deepEqual(parseCurrency('$0 / $19.99'), { currency: 'USD', amount: 19.99 });
+  assert.deepEqual(parseCurrency('100 ABC or 25 EUR'), { currency: 'EUR', amount: 25 });
+  assert.deepEqual(parseCurrency('₹12,34,567.89'), { currency: 'INR', amount: 1234567.89 });
 });
 
 const parseWithSharedSymbols = globalThis.HCCCurrencyParser.createCurrencyParser({

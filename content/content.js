@@ -188,8 +188,12 @@
     let node = element.firstChild;
     while (node) {
       if (node.nodeType === Node.TEXT_NODE) {
-        text += node.textContent;
-        if (text.length > limit && text.trim().length > limit) return null;
+        const chunk = node.textContent;
+        if (chunk) {
+          if (text && !/\s$/.test(text) && !/^\s/.test(chunk)) text += ' ';
+          text += chunk;
+          if (text.length > limit && text.trim().length > limit) return null;
+        }
       } else if (node.firstChild && !SKIPPED_TEXT_TAGS.has(node.tagName)) {
         node = node.firstChild;
         continue;

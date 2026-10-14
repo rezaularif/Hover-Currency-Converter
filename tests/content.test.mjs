@@ -18,6 +18,7 @@ function setup({ hostname = 'shop.example.com', pathname = '/', lang = 'en', syn
   function link(parent) {
     parent.childNodes.forEach((child, index) => {
       child.parentNode = parent;
+      if (child.nodeType !== 3) child.parentElement = parent;
       child.nextSibling = parent.childNodes[index + 1] ?? null;
       if (child.childNodes) link(child);
     });
@@ -195,6 +196,25 @@ test('only short ancestor text is searched for split prices', async () => {
   const price = app.element('$ 10', {}, [{ nodeType: 3, textContent: '$ ' }, { nodeType: 3, textContent: '10' }]);
   app.event('mouseover', app.element('10', {}, null, price));
   assert.equal(app.requests[0].message.amount, 10);
+
+  const splitCodePrice = app.element('PriceUSD 25', {}, [
+    app.element('Price'),
+    app.element('USD'),
+    app.element('25')
+  ]);
+  app.event('mouseover', splitCodePrice.childNodes[2]);
+  assert.equal(app.requests[1].message.fromCurrency, 'USD');
+  assert.equal(app.requests[1].message.amount, 25);
+
+  const splitSymbolPrice = app.element('Totalkr199incl. VAT', {}, [
+    app.element('Total'),
+    app.element('kr'),
+    app.element('199'),
+    app.element('incl. VAT')
+  ]);
+  app.event('mouseover', splitSymbolPrice.childNodes[2]);
+  assert.equal(app.requests[2].message.fromCurrency, 'SEK');
+  assert.equal(app.requests[2].message.amount, 199);
 });
 
 test('Danish prices are not converted for a Danish user on a Danish site', async () => {

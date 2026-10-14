@@ -44,6 +44,7 @@ const NON_FIAT_NAME_PATTERNS = [
 ];
 
 const CURRENCIES_API_URL = 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies.json';
+const CURRENCIES_API_FALLBACK_URL = 'https://latest.currency-api.pages.dev/v1/currencies.json';
 const CURRENCIES_CACHE_DURATION = 24 * 60 * 60 * 1000;
 const CURRENCIES_API_TIMEOUT_MS = 10000;
 const DEFAULT_TARGET_CURRENCY = DEFAULT_SYNC_SETTINGS.targetCurrency;
@@ -67,9 +68,16 @@ async function fetchCurrencies() {
       return cached.currenciesList;
     }
 
-    const data = await fetchJsonWithRetry(CURRENCIES_API_URL, {
-      timeoutMs: CURRENCIES_API_TIMEOUT_MS
-    });
+    let data;
+    try {
+      data = await fetchJsonWithRetry(CURRENCIES_API_URL, {
+        timeoutMs: CURRENCIES_API_TIMEOUT_MS
+      });
+    } catch {
+      data = await fetchJsonWithRetry(CURRENCIES_API_FALLBACK_URL, {
+        timeoutMs: CURRENCIES_API_TIMEOUT_MS
+      });
+    }
     if (!data || typeof data !== 'object') {
       throw new Error('Invalid currencies API response');
     }
@@ -444,26 +452,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Rates status
-    if (result.lastFetch) {
-      const lastUpdate = new Date(result.lastFetch);
-      const now = new Date();
-      const diffMinutes = Math.floor((now - lastUpdate) / 60000);
-
+    const diffMinutes = result.lastFetch ? Math.floor((Date.now() - result.lastFetch) / 60000) : Infinity;
+    if (diffMinutes < 60) {
+      statusDot.classList.remove('error');
       statusDot.classList.add('success');
       if (diffMinutes < 1) {
         statusText.textContent = 'Rates updated just now';
-      } else if (diffMinutes < 60) {
-        statusText.textContent = `Rates updated ${diffMinutes}m ago`;
       } else {
-        const diffHours = Math.floor(diffMinutes / 60);
-        statusText.textContent = `Rates updated ${diffHours}h ago`;
+        statusText.textContent = `Rates updated ${diffMinutes}m ago`;
       }
     } else {
       chrome.runtime.sendMessage({ type: 'getRates' }, (response) => {
         if (response?.success) {
+          statusDot.classList.remove('error');
           statusDot.classList.add('success');
           statusText.textContent = 'Rates loaded successfully';
+        } else if (Number.isFinite(diffMinutes)) {
+          statusDot.classList.remove('error');
+          statusDot.classList.add('success');
+          const diffHours = Math.floor(diffMinutes / 60);
+          statusText.textContent = `Rates updated ${diffHours}h ago`;
         } else {
+          statusDot.classList.remove('success');
           statusDot.classList.add('error');
           statusText.textContent = 'Failed to load rates';
         }
