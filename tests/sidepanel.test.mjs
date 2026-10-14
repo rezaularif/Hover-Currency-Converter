@@ -287,19 +287,33 @@ test('currency list fetch falls back to pages.dev when primary CDN fails', async
   assert.deepEqual(JSON.parse(JSON.stringify(app.pickers.target.entries.list.map(entry => entry.code))), ['USD', 'EUR']);
 });
 
-test('stale cached rates trigger a background getRates refresh on panel open', async () => {
+test('stale cached rates trigger a background getRates refresh on panel open and preserve age when refresh falls back to stale cache', async () => {
+  const staleTime = Date.now() - 2 * 60 * 60 * 1000;
   const app = setup({
     local: {
       currenciesList: { usd: 'US Dollar', eur: 'Euro' },
       currenciesListFetchedAt: Date.now(),
-      lastFetch: Date.now() - 2 * 60 * 60 * 1000
+      lastFetch: staleTime
     }
   });
   await flush();
   await flush();
   const rateReq = app.requests.find(r => r.message.type === 'getRates');
   assert.ok(rateReq);
-  rateReq.resolve({ success: true });
-  assert.equal(app.getElement('.status-text').textContent, 'Rates loaded successfully');
+  rateReq.resolve({ success: true, lastFetch: staleTime });
+  assert.equal(app.getElement('.status-text').textContent, 'Rates updated 2h ago');
   assert.equal(app.getElement('.status-dot').classList.contains('success'), true);
+
+  const freshApp = setup({
+    local: {
+      currenciesList: { usd: 'US Dollar', eur: 'Euro' },
+      currenciesListFetchedAt: Date.now(),
+      lastFetch: staleTime
+    }
+  });
+  await flush();
+  await flush();
+  const freshReq = freshApp.requests.find(r => r.message.type === 'getRates');
+  freshReq.resolve({ success: true, lastFetch: Date.now() });
+  assert.equal(freshApp.getElement('.status-text').textContent, 'Rates updated just now');
 });

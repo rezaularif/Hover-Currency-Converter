@@ -88,9 +88,12 @@ test('worker conversion boundary, caching, and error responses', async t => {
     assert.match(urls[3], /currency-api.pages.dev/);
   });
 
-  await t.test('offline refresh preserves usable stale rates', async () => {
-    const app = await setup({ lastFetch: 0, fetchImpl: async () => { throw new Error('Offline'); } });
-    assert.equal((await app.send(conversion)).converted, 9);
+  await t.test('offline refresh preserves usable stale rates and lastFetch', async () => {
+    const staleTime = 1700000000000;
+    const app = await setup({ lastFetch: staleTime, fetchImpl: async () => { throw new Error('Offline'); } });
+    const [conv, status] = await Promise.all([app.send(conversion), app.send({ type: 'getRates' })]);
+    assert.equal(conv.converted, 9);
+    assert.deepEqual(status, { success: true, lastFetch: staleTime });
     assert.equal(app.calls(), 6);
   });
 

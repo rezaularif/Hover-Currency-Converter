@@ -452,26 +452,33 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Rates status
-    const diffMinutes = result.lastFetch ? Math.floor((Date.now() - result.lastFetch) / 60000) : Infinity;
-    if (diffMinutes < 60) {
+    function setRateStatus(timestamp) {
       statusDot.classList.remove('error');
       statusDot.classList.add('success');
+      if (!timestamp) {
+        statusText.textContent = 'Rates loaded successfully';
+        return;
+      }
+      const diffMinutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60000));
       if (diffMinutes < 1) {
         statusText.textContent = 'Rates updated just now';
-      } else {
+      } else if (diffMinutes < 60) {
         statusText.textContent = `Rates updated ${diffMinutes}m ago`;
+      } else {
+        const diffHours = Math.floor(diffMinutes / 60);
+        statusText.textContent = `Rates updated ${diffHours}h ago`;
       }
+    }
+
+    const diffMinutes = result.lastFetch ? Math.floor((Date.now() - result.lastFetch) / 60000) : Infinity;
+    if (diffMinutes < 60) {
+      setRateStatus(result.lastFetch);
     } else {
       chrome.runtime.sendMessage({ type: 'getRates' }, (response) => {
         if (response?.success) {
-          statusDot.classList.remove('error');
-          statusDot.classList.add('success');
-          statusText.textContent = 'Rates loaded successfully';
-        } else if (Number.isFinite(diffMinutes)) {
-          statusDot.classList.remove('error');
-          statusDot.classList.add('success');
-          const diffHours = Math.floor(diffMinutes / 60);
-          statusText.textContent = `Rates updated ${diffHours}h ago`;
+          setRateStatus(response.lastFetch || result.lastFetch);
+        } else if (result.lastFetch) {
+          setRateStatus(result.lastFetch);
         } else {
           statusDot.classList.remove('success');
           statusDot.classList.add('error');

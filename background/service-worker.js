@@ -81,8 +81,12 @@ async function fetchRates() {
     } catch (error) {
       console.error('Failed to fetch rates:', error.message);
       try {
-        const stored = await chrome.storage.local.get({ rates: null });
-        return ratesCache || stored.rates;
+        const stored = await chrome.storage.local.get({ rates: null, lastFetch: 0 });
+        if (stored.rates && !ratesCache) {
+          ratesCache = stored.rates;
+          lastFetch = stored.lastFetch || 0;
+        }
+        return ratesCache;
       } catch {
         return ratesCache;
       }
@@ -116,7 +120,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   fetchRates().then(rates => {
     if (message.type === 'getRates') {
-      sendResponse({ success: !!rates });
+      sendResponse({ success: !!rates, lastFetch: lastFetch || null });
       return;
     }
     const result = convertCurrency(message.amount, message.fromCurrency, message.toCurrency, rates);

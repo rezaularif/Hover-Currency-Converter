@@ -46,6 +46,7 @@
   const MOUSE_MOVE_INTERVAL_MS = 16;
   const HIDE_DELAY_MS = 100;
   const PASSIVE_CAPTURE = { capture: true, passive: true };
+  const WORD_BOUNDARY_PAIR = /[A-Za-z\u00C0-\u024F\d][A-Za-z\u00C0-\u024F\d]/;
   const SKIPPED_TEXT_TAGS = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE']);
 
   const numberFormats = new Map();
@@ -190,7 +191,7 @@
       if (node.nodeType === Node.TEXT_NODE) {
         const chunk = node.textContent;
         if (chunk) {
-          if (text && !/\s$/.test(text) && !/^\s/.test(chunk)) text += ' ';
+          if (text && WORD_BOUNDARY_PAIR.test(`${text.at(-1)}${chunk[0]}`)) text += ' ';
           text += chunk;
           if (text.length > limit && text.trim().length > limit) return null;
         }
