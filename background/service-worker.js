@@ -61,12 +61,14 @@ async function fetchRates() {
       let data;
       try {
         data = await fetchJsonWithRetry(`${API_BASE}/currencies/usd.json`, { timeoutMs: API_TIMEOUT_MS });
-        if (!data?.usd || typeof data.usd !== 'object') throw new Error('Invalid rates API response');
+        if (!data?.usd || typeof data.usd !== 'object' || Array.isArray(data.usd)) {
+          throw new Error('Invalid rates API response');
+        }
       } catch (e) {
         data = await fetchJsonWithRetry(`${API_FALLBACK}/currencies/usd.json`, { timeoutMs: API_TIMEOUT_MS });
       }
 
-      if (data && data.usd) {
+      if (data?.usd && typeof data.usd === 'object' && !Array.isArray(data.usd)) {
         const rates = {};
         for (const [code, rate] of Object.entries(data.usd)) {
           if (Number.isFinite(rate) && rate > 0) rates[code.toUpperCase()] = rate;
@@ -78,7 +80,11 @@ async function fetchRates() {
         return ratesCache;
       }
 
-      return stored.rates || null;
+      if (stored.rates && !ratesCache) {
+        ratesCache = stored.rates;
+        lastFetch = stored.lastFetch || 0;
+      }
+      return ratesCache || stored.rates || null;
     } catch (error) {
       console.error('Failed to fetch rates:', error.message);
       try {
@@ -87,7 +93,7 @@ async function fetchRates() {
           ratesCache = stored.rates;
           lastFetch = stored.lastFetch || 0;
         }
-        return ratesCache;
+        return ratesCache || stored.rates || null;
       } catch {
         return ratesCache;
       }

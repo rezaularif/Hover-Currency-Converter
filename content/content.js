@@ -204,9 +204,11 @@
         node = node.parentNode;
         if (!node || node === element) {
           const trimmedJoined = joined.trim();
-          const trimmedSpaced = spaced.trim();
           if (!trimmedJoined) return [];
-          return trimmedSpaced !== trimmedJoined ? [trimmedJoined, trimmedSpaced] : [trimmedJoined];
+          const trimmedSpaced = spaced.trim();
+          return trimmedSpaced !== trimmedJoined && trimmedSpaced.length <= limit
+            ? [trimmedJoined, trimmedSpaced]
+            : [trimmedJoined];
         }
       }
       node = node.nextSibling;

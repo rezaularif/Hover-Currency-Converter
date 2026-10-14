@@ -271,7 +271,7 @@ test('loaded currencies populate both pickers and swap exchanges them', async ()
 });
 
 test('currency list fetch falls back to pages.dev when primary CDN fails or returns invalid data', async () => {
-  for (const failure of ['throw', null, []]) {
+  for (const failure of ['throw', null, [], {}]) {
     const urls = [];
     const app = setup({
       local: { currenciesList: null, currenciesListFetchedAt: 0 },

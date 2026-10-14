@@ -52,7 +52,8 @@ const DEFAULT_FROM_CURRENCY = DEFAULT_SYNC_SETTINGS.fromCurrency;
 const DEFAULT_RESULT_GRADIENT = DEFAULT_LOCAL_SETTINGS.resultGradient;
 
 function isValidCurrenciesResponse(data) {
-  return Boolean(data && typeof data === 'object' && !Array.isArray(data));
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return false;
+  return Object.entries(data).some(([code, name]) => isFiatCurrencyEntry(code, name));
 }
 
 async function fetchCurrenciesFromUrl(url) {
